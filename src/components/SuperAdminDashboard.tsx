@@ -80,6 +80,36 @@ export default function SuperAdminDashboard({
 
   const countCustomers = (partnerId: string) => customers.filter(c => c.partnerId === partnerId).length;
 
+  // Total Customers State & Controls (Hover & Static List with Search)
+  const [isTotalCustomersBoxOpen, setIsTotalCustomersBoxOpen] = useState(false);
+  const [hoverCustomerSearch, setHoverCustomerSearch] = useState('');
+  const [staticCustomerSearch, setStaticCustomerSearch] = useState('');
+  const [isHoverCustomerSearchFocused, setIsHoverCustomerSearchFocused] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(() => customers.length > 0 ? customers[0].id : null);
+  const [customerActionNotice, setCustomerActionNotice] = useState<string | null>(null);
+
+  const selectedCustomer = customers.find(c => c.id === selectedCustomerId) || null;
+
+  const handleSelectCustomer = (c: Customer | null) => {
+    if (!c) {
+      setSelectedCustomerId(null);
+      setCustomerActionNotice('Customer selection cleared.');
+    } else {
+      setSelectedCustomerId(c.id);
+      setCustomerActionNotice(`Selected active customer: "${c.name}"`);
+    }
+    setTimeout(() => setCustomerActionNotice(null), 4000);
+  };
+
+  const filteredHoverCustomers = customers.filter(c => 
+    !hoverCustomerSearch.trim() || c.name.toLowerCase().includes(hoverCustomerSearch.toLowerCase().trim())
+  );
+
+  const filteredStaticCustomers = customers.filter(c => 
+    !staticCustomerSearch.trim() || c.name.toLowerCase().includes(staticCustomerSearch.toLowerCase().trim())
+  );
+
+
   // Form State: Partner
   const [pName, setPName] = useState('');
   const [pDomain, setPDomain] = useState('');
@@ -524,15 +554,183 @@ export default function SuperAdminDashboard({
         </div>
 
 
-        <div className="bg-neutral-905 p-5 rounded-xl border border-neutral-800 flex flex-col justify-between" id="bento_stat_2">
-          <span className="text-xs text-neutral-500 font-mono">TOTAL CUSTOMERS</span>
+        {/* Bento Stat: TOTAL CUSTOMERS (Hover shows list with search & select, click toggles static on-page list) */}
+        <div 
+          className="relative group bg-neutral-905 p-5 rounded-xl border border-neutral-800 hover:border-emerald-500/60 transition-all flex flex-col justify-between cursor-pointer select-none" 
+          id="bento_stat_customers"
+          onClick={() => setIsTotalCustomersBoxOpen(prev => !prev)}
+        >
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsTotalCustomersBoxOpen(prev => !prev);
+              }}
+              className="text-xs text-emerald-400 hover:text-emerald-300 font-mono font-bold tracking-wider uppercase flex items-center gap-1.5 text-left cursor-pointer"
+              title="Click to toggle static Customer Workspaces list on page"
+            >
+              <Globe className="w-3.5 h-3.5 text-emerald-400" />
+              <span>TOTAL CUSTOMERS</span>
+            </button>
+            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+              {customers.length}
+            </span>
+          </div>
+
           <div>
-            <h3 className="text-3xl font-bold text-white mt-1">{customers.length}</h3>
+            <h3 className="text-3xl font-bold text-white mt-1 flex items-baseline gap-2">
+              {customers.length}
+              {selectedCustomer && (
+                <span className="text-[10px] font-mono text-emerald-300 font-semibold truncate max-w-[120px]" title={selectedCustomer.name}>
+                  ({selectedCustomer.name})
+                </span>
+              )}
+            </h3>
             <p className="text-[10px] text-neutral-400 mt-1 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Including white-labeled instances
+              <span className={`w-1.5 h-1.5 rounded-full ${selectedCustomerId ? 'bg-emerald-400 animate-pulse' : 'bg-emerald-500'}`} />
+              <span className="truncate">{selectedCustomer ? `Active: ${selectedCustomer.name}` : 'Including white-labeled instances'}</span>
             </p>
+            <div className="mt-2 text-[10px] text-emerald-400/90 font-mono flex items-center gap-1">
+              <span>{isTotalCustomersBoxOpen ? '▼ Click to close box' : '▲ Click label to open box'}</span>
+            </div>
+          </div>
+
+          {/* Hover Floating List: Appears when hovering over TOTAL CUSTOMERS */}
+          <div 
+            className={`absolute top-full left-0 sm:left-auto sm:right-0 mt-2 w-84 sm:w-96 bg-[#0c0d12] border border-emerald-500/60 rounded-xl p-3.5 shadow-2xl z-50 transition-all duration-200 backdrop-blur-md before:content-[''] before:absolute before:-top-3 before:left-0 before:right-0 before:h-3 ${
+              isHoverCustomerSearchFocused 
+                ? 'opacity-100 pointer-events-auto' 
+                : 'pointer-events-none group-hover:pointer-events-auto opacity-0 group-hover:opacity-100'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-neutral-800">
+              <div className="flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-xs font-bold text-white uppercase font-mono">
+                  TOTAL CUSTOMERS ({filteredHoverCustomers.length})
+                </span>
+              </div>
+              <span className="text-[9px] text-neutral-400 font-mono">Hover & Select</span>
+            </div>
+
+            {/* Search window at the top of hover list */}
+            <div className="relative mb-2.5">
+              <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={hoverCustomerSearch}
+                onChange={(e) => setHoverCustomerSearch(e.target.value)}
+                onFocus={() => setIsHoverCustomerSearchFocused(true)}
+                onBlur={() => setIsHoverCustomerSearchFocused(false)}
+                placeholder="Search customers by name..."
+                className="w-full bg-neutral-900 border border-neutral-700/80 rounded-lg pl-8 pr-7 py-1.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              />
+              {hoverCustomerSearch && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setHoverCustomerSearch('');
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white p-0.5 cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* List of matching customers showing image and name */}
+            {filteredHoverCustomers.length === 0 ? (
+              <div className="py-4 text-center">
+                <p className="text-xs text-neutral-400">No customers matching "{hoverCustomerSearch}"</p>
+                <button
+                  type="button"
+                  onClick={() => setHoverCustomerSearch('')}
+                  className="mt-1.5 text-[10px] text-emerald-400 hover:underline cursor-pointer font-mono"
+                >
+                  Clear search
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-72 overflow-y-auto pr-0.5">
+                {filteredHoverCustomers.map((c) => {
+                  const isSelected = selectedCustomerId === c.id;
+                  const parentPartner = partners.find(p => p.id === c.partnerId);
+                  return (
+                    <div 
+                      key={c.id} 
+                      onClick={() => handleSelectCustomer(c)}
+                      className={`p-2 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
+                        isSelected 
+                          ? 'bg-emerald-950/70 border-emerald-500/80 ring-1 ring-emerald-500/50' 
+                          : 'bg-neutral-900 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-850'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <img 
+                          src={c.logoUrl} 
+                          alt={c.name} 
+                          className="w-8 h-8 rounded-md object-cover bg-neutral-800 border border-neutral-700 shrink-0" 
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-white truncate">
+                            {c.name}
+                          </p>
+                          <div className="flex items-center gap-1.5 text-[10px] text-neutral-400 font-mono truncate">
+                            <span>{parentPartner ? parentPartner.name : 'Direct Account'}</span>
+                            <span>•</span>
+                            <span>{countAdmins(c.id, 'customer')} admins</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isSelected ? (
+                          <span className="px-2 py-0.5 bg-emerald-500 text-neutral-950 rounded text-[10px] font-bold flex items-center gap-1">
+                            <Check className="w-3 h-3" /> Selected
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectCustomer(c);
+                            }}
+                            className="px-2 py-0.5 bg-neutral-800 hover:bg-emerald-600 hover:text-white text-neutral-300 rounded text-[10px] font-medium border border-neutral-700 hover:border-emerald-500 transition-colors cursor-pointer"
+                          >
+                            Select
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="mt-2 pt-2 border-t border-neutral-800/80 flex items-center justify-between text-[10px] text-neutral-400 font-mono">
+              <span>{selectedCustomer ? `Active: ${selectedCustomer.name}` : 'Click customer to select'}</span>
+              <button 
+                type="button"
+                className="text-emerald-400 hover:underline cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsTotalCustomersBoxOpen(true);
+                }}
+              >
+                Open Box on Page →
+              </button>
+            </div>
           </div>
         </div>
+
 
         {/* Bento Stat: ALL OPEN REQUESTS (Placed between Total Customers and Delegated Admins) */}
         <div 
@@ -897,8 +1095,211 @@ export default function SuperAdminDashboard({
         </div>
       )}
 
+      {/* ON-PAGE STATIC LIST: TOTAL CUSTOMERS */}
+      {isTotalCustomersBoxOpen && (
+        <div className="bg-[#0b0c10] border-2 border-emerald-500/60 rounded-2xl p-5 md:p-6 shadow-2xl relative animate-in fade-in duration-150 mb-6" id="sa_total_customers_panel">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-neutral-800">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  <Globe className="w-4 h-4" />
+                </span>
+                <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                  CUSTOMER PORTALS DIRECTORY
+                  <span className="text-xs font-mono font-normal px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    {filteredStaticCustomers.length} of {customers.length} Portals
+                  </span>
+                  {selectedCustomer && (
+                    <span className="text-xs font-mono font-normal px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-200 border border-emerald-500/40 flex items-center gap-1">
+                      <Check className="w-3 h-3 text-emerald-400" /> Active: {selectedCustomer.name}
+                    </span>
+                  )}
+                </h2>
+              </div>
+              <p className="text-xs text-neutral-400 mt-1">
+                Static list of active customer organizations and white-labeled portals. Search by any part of the name to compress the roster. Click any customer to select.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {selectedCustomerId && (
+                <button
+                  type="button"
+                  onClick={() => handleSelectCustomer(null)}
+                  className="px-2.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white rounded-lg text-xs font-mono border border-neutral-800 transition-colors cursor-pointer"
+                >
+                  Clear Selection
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsTotalCustomersBoxOpen(false)}
+                className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white rounded-lg text-xs font-semibold border border-neutral-800 transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Close Box</span>
+              </button>
+            </div>
+          </div>
+
+          {customerActionNotice && (
+            <div className="mt-4 p-3 bg-emerald-950/40 border border-emerald-800/60 rounded-xl text-xs text-emerald-300 flex items-center justify-between">
+              <span>{customerActionNotice}</span>
+              <button type="button" onClick={() => setCustomerActionNotice(null)} className="text-neutral-400 hover:text-white cursor-pointer">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Search window at the top of static list */}
+          <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={staticCustomerSearch}
+                onChange={(e) => setStaticCustomerSearch(e.target.value)}
+                placeholder="Search customer organizations by name (matches any part of name)..."
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-9 pr-9 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500 transition-colors"
+              />
+              {staticCustomerSearch && (
+                <button
+                  type="button"
+                  onClick={() => setStaticCustomerSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white p-0.5 cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <span className="text-[11px] font-mono text-neutral-400 shrink-0">
+              Showing {filteredStaticCustomers.length} of {customers.length} customer portals
+            </span>
+          </div>
+
+          {filteredStaticCustomers.length === 0 ? (
+            <div className="py-10 text-center">
+              <div className="w-12 h-12 rounded-full bg-neutral-900 text-neutral-500 flex items-center justify-center mx-auto mb-3">
+                <Globe className="w-6 h-6" />
+              </div>
+              <h4 className="text-sm font-bold text-white">No Matching Customer Organizations</h4>
+              <p className="text-xs text-neutral-400 mt-1 max-w-sm mx-auto">
+                No customer portals match "{staticCustomerSearch}". Try searching for another keyword.
+              </p>
+              <button
+                type="button"
+                onClick={() => setStaticCustomerSearch('')}
+                className="mt-4 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 rounded-lg text-xs font-semibold border border-neutral-800 transition-colors cursor-pointer"
+              >
+                Clear Search Filter
+              </button>
+            </div>
+          ) : (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-neutral-800 text-[11px] font-mono uppercase text-neutral-400">
+                    <th className="py-2.5 px-3">Organization / Logo</th>
+                    <th className="py-2.5 px-3">Parent Partner Owner</th>
+                    <th className="py-2.5 px-3">Portal Admins</th>
+                    <th className="py-2.5 px-3">Brand Accent</th>
+                    <th className="py-2.5 px-3 text-right">Selection</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-900">
+                  {filteredStaticCustomers.map((c) => {
+                    const isSelected = selectedCustomerId === c.id;
+                    const parentPartner = partners.find(p => p.id === c.partnerId);
+                    return (
+                      <tr 
+                        key={c.id} 
+                        onClick={() => handleSelectCustomer(c)}
+                        className={`transition-colors text-xs cursor-pointer ${
+                          isSelected 
+                            ? 'bg-emerald-950/40 text-neutral-100 hover:bg-emerald-950/60' 
+                            : 'text-neutral-200 hover:bg-neutral-900/70'
+                        }`}
+                      >
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-3">
+                            <img 
+                              src={c.logoUrl} 
+                              alt={c.name} 
+                              className="w-9 h-9 rounded-lg object-cover bg-neutral-800 border border-neutral-700 shrink-0" 
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                            <div>
+                              <h4 className="font-semibold text-sm text-white flex items-center gap-2">
+                                {c.name}
+                                {isSelected && (
+                                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-500 text-neutral-950 font-bold">
+                                    Selected
+                                  </span>
+                                )}
+                              </h4>
+                              <p className="text-[10px] text-neutral-400 font-mono">ID: {c.id}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="inline-flex items-center gap-1.5 font-medium text-neutral-200">
+                            {parentPartner ? (
+                              <span className="text-emerald-400 font-semibold">{parentPartner.name}</span>
+                            ) : (
+                              <span className="text-neutral-400">Direct Retail Account</span>
+                            )}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="font-mono text-neutral-300">
+                            {countAdmins(c.id, 'customer')} Admins
+                          </span>
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="inline-flex items-center gap-1.5 text-[11px] font-mono" style={{ color: c.accentColor }}>
+                            <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: c.accentColor }} />
+                            {c.accentColor}
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectCustomer(isSelected ? null : c);
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                              isSelected
+                                ? 'bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold shadow-xs'
+                                : 'bg-neutral-800 hover:bg-emerald-600 hover:text-white text-neutral-200 border border-neutral-700'
+                            }`}
+                          >
+                            {isSelected ? (
+                              <>
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Selected</span>
+                              </>
+                            ) : (
+                              <span>Select</span>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ON-PAGE EXPANDED BOX: ALL OPEN REQUESTS */}
       {isOpenRequestsBoxOpen && (
+
 
         <div className="bg-[#0b0c10] border-2 border-amber-500/60 rounded-2xl p-5 md:p-6 shadow-2xl relative animate-in fade-in duration-150" id="sa_open_requests_panel">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-neutral-800">
@@ -1229,45 +1630,98 @@ export default function SuperAdminDashboard({
       {activeTab === 'customers' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" id="sa_tab_customers">
           <div className="lg:col-span-2 space-y-4">
-            <div className="bg-neutral-950 rounded-xl border border-neutral-800 overflow-hidden">
-              <div className="p-4 border-b border-neutral-850 bg-neutral-900/40">
-                <h3 className="text-sm font-semibold text-white">Active Customer Organizations</h3>
-              </div>
-              <div className="divide-y divide-neutral-850">
-                {customers.map(c => {
-                  const parentPartner = partners.find(p => p.id === c.partnerId);
-                  return (
-                    <div key={c.id} className="p-4 flex items-center justify-between hover:bg-neutral-900/30 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <img src={c.logoUrl} alt={c.name} className="w-10 h-10 rounded-lg object-cover bg-neutral-800 border border-neutral-700" referrerPolicy="no-referrer" />
-                        <div>
-                          <h4 className="font-semibold text-sm text-neutral-200">{c.name}</h4>
-                          <div className="flex items-center gap-2 mt-1 text-xs text-neutral-550 font-mono">
-                            <span className="flex items-center gap-1">
-                              Owner: {parentPartner ? (
-                                <strong className="text-emerald-400">{parentPartner.name}</strong>
-                              ) : (
-                                <strong className="text-neutral-400">Direct Retail Account</strong>
-                              )}
-                            </span>
-                            <span>•</span>
-                            <span>{countAdmins(c.id, 'customer')} Portal Admins</span>
-                          </div>
-                        </div>
+            {/* Active Selected Customer Profile or Directory Guidance */}
+            {selectedCustomer ? (
+              <div className="bg-neutral-950 rounded-xl border border-emerald-500/50 p-5 space-y-4 relative overflow-hidden shadow-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-850">
+                  <div className="flex items-center gap-3">
+                    <img 
+                      src={selectedCustomer.logoUrl} 
+                      alt={selectedCustomer.name} 
+                      className="w-12 h-12 rounded-xl object-cover bg-neutral-800 border border-neutral-700 shadow-md shrink-0" 
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
+                          Active Selected Customer
+                        </span>
+                        <span className="text-xs text-neutral-500 font-mono">ID: {selectedCustomer.id}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        {parentPartner && (
-                          <span className="text-[9px] px-2 py-0.5 rounded-full border bg-neutral-900 text-neutral-400 border-neutral-850">
-                            Partner Co-Branded
-                          </span>
-                        )}
-                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c.accentColor }} />
-                      </div>
+                      <h3 className="text-lg font-bold text-white mt-1">{selectedCustomer.name}</h3>
+                      <p className="text-xs text-neutral-400 font-mono flex items-center gap-1.5 mt-0.5">
+                        <Globe className="w-3.5 h-3.5 text-neutral-500" />
+                        <span>
+                          Owner: {partners.find(p => p.id === selectedCustomer.partnerId)?.name || 'Direct Retail Account'}
+                        </span>
+                      </p>
                     </div>
-                  );
-                })}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsTotalCustomersBoxOpen(true)}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Globe className="w-3.5 h-3.5" />
+                      <span>Open Directory</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectCustomer(null)}
+                      className="px-2.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded-lg text-xs font-mono border border-neutral-800 transition-colors cursor-pointer"
+                    >
+                      Deselect
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 pt-1">
+                  <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
+                    <span className="text-[10px] font-mono uppercase text-neutral-500 block">Parent Reseller</span>
+                    <span className="text-base font-bold text-white font-mono mt-0.5 block truncate">
+                      {partners.find(p => p.id === selectedCustomer.partnerId)?.name || 'Direct'}
+                    </span>
+                  </div>
+                  <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
+                    <span className="text-[10px] font-mono uppercase text-neutral-500 block">Portal Admins</span>
+                    <span className="text-base font-bold text-white font-mono mt-0.5 block">
+                      {countAdmins(selectedCustomer.id, 'customer')} Admins
+                    </span>
+                  </div>
+                  <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
+                    <span className="text-[10px] font-mono uppercase text-neutral-500 block">Accent Color</span>
+                    <div className="inline-flex items-center gap-1.5 text-xs font-mono font-bold mt-1" style={{ color: selectedCustomer.accentColor }}>
+                      <span className="w-3 h-3 rounded-full inline-block shadow-xs" style={{ backgroundColor: selectedCustomer.accentColor }} />
+                      {selectedCustomer.accentColor}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-6 text-center space-y-3">
+                <div className="w-12 h-12 rounded-xl bg-emerald-950/40 text-emerald-400 border border-emerald-800/40 flex items-center justify-center mx-auto">
+                  <Globe className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Customer Portals Directory</h4>
+                  <p className="text-xs text-neutral-400 mt-1 max-w-md mx-auto">
+                    The list of Customer Organizations is managed via the <strong>TOTAL CUSTOMERS</strong> card above. Hover over the card to quickly search and select a customer, or click it to view the full static directory.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsTotalCustomersBoxOpen(true)}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-2"
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>Open Customer Portals Directory</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Quick Creator */}
