@@ -34,10 +34,10 @@ export default function App() {
   // Navigation state for visitors and routes
   const getInitialScreen = (): AppScreen => {
     if (typeof window !== "undefined") {
-      const p = window.location.pathname.toLowerCase();
-      if (p === "/org/setup" || p === "/org/setup/" || p === "/setup") return "setup";
-      if (p === "/request" || p.startsWith("/request/")) return "request";
-      if (p === "/orgdemo" || p.startsWith("/orgdemo/")) return "orgdemo";
+      const p = window.location.pathname.toLowerCase().replace(/\/+$/, '');
+      if (p.endsWith('/setup') || p === '/setup') return "setup";
+      if (p.endsWith('/request') || p === '/request') return "request";
+      if (p.endsWith('/orgdemo') || p === '/orgdemo') return "orgdemo";
     }
     // Always default to the VizhinORG split-screen login/setup
     return "org";
@@ -48,10 +48,12 @@ export default function App() {
   const navigateTo = (screen: AppScreen) => {
     setUnauthScreen(screen);
     if (typeof window !== "undefined") {
-      let p = "/ORG";
-      if (screen === "setup") p = "/ORG/Setup";
-      else if (screen === "orgdemo") p = "/ORGdemo";
-      else if (screen === "request") p = "/request";
+      const isUpper = window.location.pathname.includes('/ORG');
+      const base = isUpper ? '/ORG' : '/org';
+      let p = base;
+      if (screen === "setup") p = `${base}/Setup`;
+      else if (screen === "orgdemo") p = isUpper ? "/ORGdemo" : "/orgdemo";
+      else if (screen === "request") p = `${base}/request`;
       window.history.pushState({ screen }, "", p);
     }
   };
@@ -125,6 +127,13 @@ export default function App() {
 
   // Authentication State
   const [currentUser, setCurrentUser] = useState<PortalUser | null>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("logout") === "true" || params.has("reset")) {
+        localStorage.removeItem('vzn_current_user');
+        return null;
+      }
+    }
     const saved = localStorage.getItem('vzn_current_user');
     if (saved) {
       try {
