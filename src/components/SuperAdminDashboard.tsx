@@ -4,7 +4,7 @@ import { FALLBACK_GREYED_REQUESTS } from '../mockData';
 import { 
   Building2, Users, Key, Plus, Trash2, ArrowRight, CheckCircle2, 
   HelpCircle, Eye, Shield, Globe, Sparkles, Activity, FileCheck, Check,
-  Inbox, X
+  Inbox, X, Search
 } from 'lucide-react';
 
 interface SuperAdminDashboardProps {
@@ -48,6 +48,37 @@ export default function SuperAdminDashboard({
   const hasActualRequests = Boolean(openRequests && openRequests.length > 0);
   const displayedRequests = hasActualRequests ? openRequests! : sampleRequests;
   const isShowingGreyedOut = !hasActualRequests;
+
+  // Core Partners State & Controls (Hover & Static List with Search)
+  const [isCorePartnersBoxOpen, setIsCorePartnersBoxOpen] = useState(false);
+  const [hoverPartnerSearch, setHoverPartnerSearch] = useState('');
+  const [staticPartnerSearch, setStaticPartnerSearch] = useState('');
+  const [isHoverSearchFocused, setIsHoverSearchFocused] = useState(false);
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(() => partners.length > 0 ? partners[0].id : null);
+  const [partnerActionNotice, setPartnerActionNotice] = useState<string | null>(null);
+
+  const selectedPartner = partners.find(p => p.id === selectedPartnerId) || null;
+
+  const handleSelectPartner = (p: Partner | null) => {
+    if (!p) {
+      setSelectedPartnerId(null);
+      setPartnerActionNotice('Partner selection cleared.');
+    } else {
+      setSelectedPartnerId(p.id);
+      setPartnerActionNotice(`Selected active partner: "${p.name}"`);
+    }
+    setTimeout(() => setPartnerActionNotice(null), 4000);
+  };
+
+  const filteredHoverPartners = partners.filter(p => 
+    !hoverPartnerSearch.trim() || p.name.toLowerCase().includes(hoverPartnerSearch.toLowerCase().trim())
+  );
+
+  const filteredStaticPartners = partners.filter(p => 
+    !staticPartnerSearch.trim() || p.name.toLowerCase().includes(staticPartnerSearch.toLowerCase().trim())
+  );
+
+  const countCustomers = (partnerId: string) => customers.filter(c => c.partnerId === partnerId).length;
 
   // Form State: Partner
   const [pName, setPName] = useState('');
@@ -316,15 +347,182 @@ export default function SuperAdminDashboard({
 
       {/* Stats Bento Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4" id="sa_bento_grid">
-        <div className="bg-neutral-905 p-5 rounded-xl border border-neutral-800 flex flex-col justify-between" id="bento_stat_1">
-          <span className="text-xs text-neutral-500 font-mono">CORE PARTNERS</span>
+        {/* Bento Stat: CORE PARTNERS (Hover shows list with search & select, click toggles static on-page list) */}
+        <div 
+          className="relative group bg-neutral-905 p-5 rounded-xl border border-neutral-800 hover:border-blue-500/60 transition-all flex flex-col justify-between cursor-pointer select-none" 
+          id="bento_stat_partners"
+          onClick={() => setIsCorePartnersBoxOpen(prev => !prev)}
+        >
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsCorePartnersBoxOpen(prev => !prev);
+              }}
+              className="text-xs text-blue-400 hover:text-blue-300 font-mono font-bold tracking-wider uppercase flex items-center gap-1.5 text-left cursor-pointer"
+              title="Click to toggle static Core Partners list on page"
+            >
+              <Building2 className="w-3.5 h-3.5 text-blue-400" />
+              <span>CORE PARTNERS</span>
+            </button>
+            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold">
+              {partners.length}
+            </span>
+          </div>
+
           <div>
-            <h3 className="text-3xl font-bold text-white mt-1">{partners.length}</h3>
+            <h3 className="text-3xl font-bold text-white mt-1 flex items-baseline gap-2">
+              {partners.length}
+              {selectedPartner && (
+                <span className="text-[10px] font-mono text-blue-300 font-semibold truncate max-w-[120px]" title={selectedPartner.name}>
+                  ({selectedPartner.name})
+                </span>
+              )}
+            </h3>
             <p className="text-[10px] text-neutral-400 mt-1 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Isolated reseller groups
+              <span className={`w-1.5 h-1.5 rounded-full ${selectedPartnerId ? 'bg-blue-400 animate-pulse' : 'bg-blue-500'}`} />
+              <span className="truncate">{selectedPartner ? `Active: ${selectedPartner.name}` : 'Isolated reseller groups'}</span>
             </p>
+            <div className="mt-2 text-[10px] text-blue-400/90 font-mono flex items-center gap-1">
+              <span>{isCorePartnersBoxOpen ? '▼ Click to close box' : '▲ Click label to open box'}</span>
+            </div>
+          </div>
+
+          {/* Hover Floating List: Appears when hovering over CORE PARTNERS */}
+          <div 
+            className={`absolute top-full left-0 sm:left-0 mt-2 w-84 sm:w-96 bg-[#0c0d12] border border-blue-500/60 rounded-xl p-3.5 shadow-2xl z-50 transition-all duration-200 backdrop-blur-md before:content-[''] before:absolute before:-top-3 before:left-0 before:right-0 before:h-3 ${
+              isHoverSearchFocused 
+                ? 'opacity-100 pointer-events-auto' 
+                : 'pointer-events-none group-hover:pointer-events-auto opacity-0 group-hover:opacity-100'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-neutral-800">
+              <div className="flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-blue-400" />
+                <span className="text-xs font-bold text-white uppercase font-mono">
+                  CORE PARTNERS ({filteredHoverPartners.length})
+                </span>
+              </div>
+              <span className="text-[9px] text-neutral-400 font-mono">Hover & Select</span>
+            </div>
+
+            {/* Search window at the top of hover list */}
+            <div className="relative mb-2.5">
+              <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={hoverPartnerSearch}
+                onChange={(e) => setHoverPartnerSearch(e.target.value)}
+                onFocus={() => setIsHoverSearchFocused(true)}
+                onBlur={() => setIsHoverSearchFocused(false)}
+                placeholder="Search partners by name..."
+                className="w-full bg-neutral-900 border border-neutral-700/80 rounded-lg pl-8 pr-7 py-1.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              />
+              {hoverPartnerSearch && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setHoverPartnerSearch('');
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white p-0.5 cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* List of matching partners showing image and name */}
+            {filteredHoverPartners.length === 0 ? (
+              <div className="py-4 text-center">
+                <p className="text-xs text-neutral-400">No partners matching "{hoverPartnerSearch}"</p>
+                <button
+                  type="button"
+                  onClick={() => setHoverPartnerSearch('')}
+                  className="mt-1.5 text-[10px] text-blue-400 hover:underline cursor-pointer font-mono"
+                >
+                  Clear search
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-72 overflow-y-auto pr-0.5">
+                {filteredHoverPartners.map((p) => {
+                  const isSelected = selectedPartnerId === p.id;
+                  return (
+                    <div 
+                      key={p.id} 
+                      onClick={() => handleSelectPartner(p)}
+                      className={`p-2 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
+                        isSelected 
+                          ? 'bg-blue-950/70 border-blue-500/80 ring-1 ring-blue-500/50' 
+                          : 'bg-neutral-900 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-850'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <img 
+                          src={p.logoUrl} 
+                          alt={p.name} 
+                          className="w-8 h-8 rounded-md object-cover bg-neutral-800 border border-neutral-700 shrink-0" 
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-white truncate">
+                            {p.name}
+                          </p>
+                          <div className="flex items-center gap-1.5 text-[10px] text-neutral-400 font-mono truncate">
+                            <span>{p.domain || 'no domain'}</span>
+                            <span>•</span>
+                            <span>{countAdmins(p.id, 'partner')} admins</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isSelected ? (
+                          <span className="px-2 py-0.5 bg-blue-500 text-neutral-950 rounded text-[10px] font-bold flex items-center gap-1">
+                            <Check className="w-3 h-3" /> Selected
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectPartner(p);
+                            }}
+                            className="px-2 py-0.5 bg-neutral-800 hover:bg-blue-600 hover:text-white text-neutral-300 rounded text-[10px] font-medium border border-neutral-700 hover:border-blue-500 transition-colors cursor-pointer"
+                          >
+                            Select
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="mt-2 pt-2 border-t border-neutral-800/80 flex items-center justify-between text-[10px] text-neutral-400 font-mono">
+              <span>{selectedPartner ? `Active: ${selectedPartner.name}` : 'Click partner to select'}</span>
+              <button 
+                type="button"
+                className="text-blue-400 hover:underline cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCorePartnersBoxOpen(true);
+                }}
+              >
+                Open Box on Page →
+              </button>
+            </div>
           </div>
         </div>
+
 
         <div className="bg-neutral-905 p-5 rounded-xl border border-neutral-800 flex flex-col justify-between" id="bento_stat_2">
           <span className="text-xs text-neutral-500 font-mono">TOTAL CUSTOMERS</span>
@@ -495,8 +693,213 @@ export default function SuperAdminDashboard({
         </div>
       </div>
 
+      {/* ON-PAGE STATIC LIST: CORE PARTNERS */}
+      {isCorePartnersBoxOpen && (
+        <div className="bg-[#0b0c10] border-2 border-blue-500/60 rounded-2xl p-5 md:p-6 shadow-2xl relative animate-in fade-in duration-150 mb-6" id="sa_core_partners_panel">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-neutral-800">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                  <Building2 className="w-4 h-4" />
+                </span>
+                <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                  CORE PARTNERS DIRECTORY
+                  <span className="text-xs font-mono font-normal px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                    {filteredStaticPartners.length} of {partners.length} Resellers
+                  </span>
+                  {selectedPartner && (
+                    <span className="text-xs font-mono font-normal px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-200 border border-blue-500/40 flex items-center gap-1">
+                      <Check className="w-3 h-3 text-blue-400" /> Active: {selectedPartner.name}
+                    </span>
+                  )}
+                </h2>
+              </div>
+              <p className="text-xs text-neutral-400 mt-1">
+                Static list of registered reselling partners. Search by any part of the name to compress the roster. Click any partner to select.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {selectedPartnerId && (
+                <button
+                  type="button"
+                  onClick={() => handleSelectPartner(null)}
+                  className="px-2.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white rounded-lg text-xs font-mono border border-neutral-800 transition-colors cursor-pointer"
+                >
+                  Clear Selection
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsCorePartnersBoxOpen(false)}
+                className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white rounded-lg text-xs font-semibold border border-neutral-800 transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Close Box</span>
+              </button>
+            </div>
+          </div>
+
+          {partnerActionNotice && (
+            <div className="mt-4 p-3 bg-blue-950/40 border border-blue-800/60 rounded-xl text-xs text-blue-300 flex items-center justify-between">
+              <span>{partnerActionNotice}</span>
+              <button type="button" onClick={() => setPartnerActionNotice(null)} className="text-neutral-400 hover:text-white cursor-pointer">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Search window at the top of static list */}
+          <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={staticPartnerSearch}
+                onChange={(e) => setStaticPartnerSearch(e.target.value)}
+                placeholder="Search reseller partners by name (matches any part of name)..."
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-9 pr-9 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500 transition-colors"
+              />
+              {staticPartnerSearch && (
+                <button
+                  type="button"
+                  onClick={() => setStaticPartnerSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white p-0.5 cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <span className="text-[11px] font-mono text-neutral-400 shrink-0">
+              Showing {filteredStaticPartners.length} of {partners.length} partners
+            </span>
+          </div>
+
+          {filteredStaticPartners.length === 0 ? (
+            <div className="py-10 text-center">
+              <div className="w-12 h-12 rounded-full bg-neutral-900 text-neutral-500 flex items-center justify-center mx-auto mb-3">
+                <Building2 className="w-6 h-6" />
+              </div>
+              <h4 className="text-sm font-bold text-white">No Matching Reselling Partners</h4>
+              <p className="text-xs text-neutral-400 mt-1 max-w-sm mx-auto">
+                No partners match "{staticPartnerSearch}". Try searching for another keyword.
+              </p>
+              <button
+                type="button"
+                onClick={() => setStaticPartnerSearch('')}
+                className="mt-4 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 rounded-lg text-xs font-semibold border border-neutral-800 transition-colors cursor-pointer"
+              >
+                Clear Search Filter
+              </button>
+            </div>
+          ) : (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-neutral-800 text-[11px] font-mono uppercase text-neutral-400">
+                    <th className="py-2.5 px-3">Partner / Logo</th>
+                    <th className="py-2.5 px-3">Domain</th>
+                    <th className="py-2.5 px-3">Customer Portals</th>
+                    <th className="py-2.5 px-3">Admin Accounts</th>
+                    <th className="py-2.5 px-3">Accent Brand</th>
+                    <th className="py-2.5 px-3 text-right">Selection</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-900">
+                  {filteredStaticPartners.map((p) => {
+                    const isSelected = selectedPartnerId === p.id;
+                    return (
+                      <tr 
+                        key={p.id} 
+                        onClick={() => handleSelectPartner(p)}
+                        className={`transition-colors text-xs cursor-pointer ${
+                          isSelected 
+                            ? 'bg-blue-950/40 text-neutral-100 hover:bg-blue-950/60' 
+                            : 'text-neutral-200 hover:bg-neutral-900/70'
+                        }`}
+                      >
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-3">
+                            <img 
+                              src={p.logoUrl} 
+                              alt={p.name} 
+                              className="w-9 h-9 rounded-lg object-cover bg-neutral-800 border border-neutral-700 shrink-0" 
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                            <div>
+                              <h4 className="font-semibold text-sm text-white flex items-center gap-2">
+                                {p.name}
+                                {isSelected && (
+                                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-blue-500 text-neutral-950 font-bold">
+                                    Selected
+                                  </span>
+                                )}
+                              </h4>
+                              <p className="text-[10px] text-neutral-400 font-mono">ID: {p.id}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="inline-flex items-center gap-1.5 text-neutral-300 font-mono text-[11px]">
+                            <Globe className="w-3.5 h-3.5 text-neutral-500" />
+                            {p.domain || 'no domain configured'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="font-mono text-neutral-300">
+                            {countCustomers(p.id)} Portals
+                          </span>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="font-mono text-neutral-300">
+                            {countAdmins(p.id, 'partner')} Admins
+                          </span>
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="inline-flex items-center gap-1.5 text-[11px] font-mono" style={{ color: p.accentColor }}>
+                            <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: p.accentColor }} />
+                            {p.accentColor}
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectPartner(isSelected ? null : p);
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                              isSelected
+                                ? 'bg-blue-500 hover:bg-blue-400 text-neutral-950 font-bold shadow-xs'
+                                : 'bg-neutral-800 hover:bg-blue-600 hover:text-white text-neutral-200 border border-neutral-700'
+                            }`}
+                          >
+                            {isSelected ? (
+                              <>
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Selected</span>
+                              </>
+                            ) : (
+                              <span>Select</span>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ON-PAGE EXPANDED BOX: ALL OPEN REQUESTS */}
       {isOpenRequestsBoxOpen && (
+
         <div className="bg-[#0b0c10] border-2 border-amber-500/60 rounded-2xl p-5 md:p-6 shadow-2xl relative animate-in fade-in duration-150" id="sa_open_requests_panel">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-neutral-800">
             <div>
@@ -657,38 +1060,93 @@ export default function SuperAdminDashboard({
       {activeTab === 'partners' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" id="sa_tab_partners">
           <div className="lg:col-span-2 space-y-4">
-            <div className="bg-neutral-950 rounded-xl border border-neutral-800 overflow-hidden">
-              <div className="p-4 border-b border-neutral-850 bg-neutral-900/40">
-                <h3 className="text-sm font-semibold text-white">Registered Reselling Partners</h3>
-              </div>
-              <div className="divide-y divide-neutral-850">
-                {partners.map(p => (
-                  <div key={p.id} className="p-4 flex items-center justify-between hover:bg-neutral-900/30 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <img src={p.logoUrl} alt={p.name} className="w-10 h-10 rounded-lg object-cover bg-neutral-800 border border-neutral-700" referrerPolicy="no-referrer" />
-                      <div>
-                        <h4 className="font-semibold text-sm text-neutral-200">{p.name}</h4>
-                        <div className="flex items-center gap-2 mt-1 text-xs text-neutral-550 font-mono">
-                          <span className="flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> {p.domain || 'no domain'}</span>
-                          <span>•</span>
-                          <span>{countAdmins(p.id, 'partner')} Admin accounts</span>
-                        </div>
+            {/* Active Selected Partner Profile or Directory Guidance */}
+            {selectedPartner ? (
+              <div className="bg-neutral-950 rounded-xl border border-blue-500/50 p-5 space-y-4 relative overflow-hidden shadow-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-850">
+                  <div className="flex items-center gap-3">
+                    <img 
+                      src={selectedPartner.logoUrl} 
+                      alt={selectedPartner.name} 
+                      className="w-12 h-12 rounded-xl object-cover bg-neutral-800 border border-neutral-700 shadow-md shrink-0" 
+                      referrerPolicy="no-referrer"
+                    />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/40 font-bold">
+                          Active Selected Partner
+                        </span>
+                        <span className="text-xs text-neutral-500 font-mono">ID: {selectedPartner.id}</span>
                       </div>
-                    </div>
-                    {/* Visual Badge showing primary colors of partners */}
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <span className="text-[10px] font-mono text-neutral-500 block">Accent Accent</span>
-                        <div className="inline-flex items-center gap-1 text-[11px] font-mono" style={{ color: p.accentColor }}>
-                          <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: p.accentColor }} />
-                          {p.accentColor}
-                        </div>
-                      </div>
+                      <h3 className="text-lg font-bold text-white mt-1">{selectedPartner.name}</h3>
+                      <p className="text-xs text-neutral-400 font-mono flex items-center gap-1.5 mt-0.5">
+                        <Globe className="w-3.5 h-3.5 text-neutral-500" />
+                        <span>{selectedPartner.domain || 'no domain configured'}</span>
+                      </p>
                     </div>
                   </div>
-                ))}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsCorePartnersBoxOpen(true)}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Building2 className="w-3.5 h-3.5" />
+                      <span>Open Directory</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPartner(null)}
+                      className="px-2.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded-lg text-xs font-mono border border-neutral-800 transition-colors cursor-pointer"
+                    >
+                      Deselect
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 pt-1">
+                  <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
+                    <span className="text-[10px] font-mono uppercase text-neutral-500 block">Customer Portals</span>
+                    <span className="text-base font-bold text-white font-mono mt-0.5 block">
+                      {countCustomers(selectedPartner.id)} Sub-tenants
+                    </span>
+                  </div>
+                  <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
+                    <span className="text-[10px] font-mono uppercase text-neutral-500 block">Delegated Admins</span>
+                    <span className="text-base font-bold text-white font-mono mt-0.5 block">
+                      {countAdmins(selectedPartner.id, 'partner')} Accounts
+                    </span>
+                  </div>
+                  <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
+                    <span className="text-[10px] font-mono uppercase text-neutral-500 block">Brand Color</span>
+                    <div className="inline-flex items-center gap-1.5 text-xs font-mono font-bold mt-1" style={{ color: selectedPartner.accentColor }}>
+                      <span className="w-3 h-3 rounded-full inline-block shadow-xs" style={{ backgroundColor: selectedPartner.accentColor }} />
+                      {selectedPartner.accentColor}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-6 text-center space-y-3">
+                <div className="w-12 h-12 rounded-xl bg-blue-950/40 text-blue-400 border border-blue-800/40 flex items-center justify-center mx-auto">
+                  <Building2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Core Partners Directory</h4>
+                  <p className="text-xs text-neutral-400 mt-1 max-w-md mx-auto">
+                    The list of Registered Reselling Partners is managed via the <strong>CORE PARTNERS</strong> card above. Hover over the card to quickly search and select a partner, or click it to view the full static directory.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCorePartnersBoxOpen(true)}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-2"
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>Open Core Partners Directory</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Quick Creator */}
