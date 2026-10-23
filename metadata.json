@@ -1,0 +1,8 @@
+{
+  "name": "Remix Vizhin Portal 2 - ORG",
+  "description": "Enterprise-grade white-labeled multi-tenant CRM portal featuring multi-level administrative structures, logo customization, secure login protection, password managers compatibility, and comprehensive Supabase integration schemas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
