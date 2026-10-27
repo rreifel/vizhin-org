@@ -74,7 +74,15 @@ export default function SuperAdminDashboard({
   const [viewingResellerDashboard, setViewingResellerDashboard] = useState<Partner | null>(null);
   const [viewingCustomerDashboard, setViewingCustomerDashboard] = useState<Customer | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'partners' | 'customers' | 'admins' | 'audit'>('partners');
+  const [isAddComingSoonOpen, setIsAddComingSoonOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'admins' | 'audit'>('admins');
+  const [showVizhinAddAdminModal, setShowVizhinAddAdminModal] = useState(false);
+  const [vizhinFirstName, setVizhinFirstName] = useState('');
+  const [vizhinLastName, setVizhinLastName] = useState('');
+  const [vizhinEmail, setVizhinEmail] = useState('');
+  const [vizhinRole, setVizhinRole] = useState<'SUPER_ADMIN' | 'PARTNER_ADMIN' | 'CUSTOMER_ADMIN'>('SUPER_ADMIN');
+  const [vizhinSelectedPartners, setVizhinSelectedPartners] = useState<string[]>([]);
+  const [setupAdminComingSoonMsg, setSetupAdminComingSoonMsg] = useState<string | null>(null);
   
   // Open Requests State & Controls
   const [sampleRequests, setSampleRequests] = useState<WorkspaceRequest[]>(FALLBACK_GREYED_REQUESTS);
@@ -1784,6 +1792,76 @@ export default function SuperAdminDashboard({
     );
   }
 
+  if (isAddComingSoonOpen) {
+    return (
+      <div className="space-y-6" id="super_admin_add_coming_soon">
+        <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-xl flex items-center justify-between shadow-md">
+          <button
+            type="button"
+            onClick={() => setIsAddComingSoonOpen(false)}
+            className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-xs font-bold flex items-center gap-2 border border-neutral-700 cursor-pointer transition-colors shadow-sm"
+          >
+            <ArrowLeft className="w-4 h-4 text-emerald-400" />
+            <span>← Back to Super Admin Dashboard</span>
+          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono text-emerald-400 bg-emerald-950 px-3 py-1.5 rounded-full border border-emerald-800 flex items-center gap-1.5 font-semibold">
+              <Sparkles className="w-3.5 h-3.5" />
+              Onboarding Portal
+            </span>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-b from-neutral-900/90 to-neutral-950 border border-neutral-800 rounded-2xl p-8 sm:p-14 text-center max-w-3xl mx-auto shadow-2xl relative overflow-hidden">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 mb-6 shadow-inner">
+            <UserPlus className="w-8 h-8" />
+          </div>
+
+          <span className="inline-block px-3 py-1 rounded-full text-[11px] font-mono font-semibold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 mb-3">
+            Coming Soon
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-3">
+            Add New Customers and Partners
+          </h1>
+          <p className="text-neutral-400 text-sm sm:text-base max-w-xl mx-auto leading-relaxed mb-8">
+            Self-service onboarding and automated workspace provisioning for new reselling partners and customer sub-accounts are currently under development.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left max-w-xl mx-auto mb-8">
+            <div className="p-4 bg-neutral-900/60 border border-neutral-800 rounded-xl space-y-1.5">
+              <div className="flex items-center gap-2 text-white font-semibold text-xs">
+                <Building2 className="w-4 h-4 text-blue-400" />
+                <span>New Reseller Partner</span>
+              </div>
+              <p className="text-neutral-500 text-[11px]">
+                Create independent reseller tenants, assign custom domains, configure branding, and establish root administrators.
+              </p>
+            </div>
+            <div className="p-4 bg-neutral-900/60 border border-neutral-800 rounded-xl space-y-1.5">
+              <div className="flex items-center gap-2 text-white font-semibold text-xs">
+                <Globe className="w-4 h-4 text-emerald-400" />
+                <span>New Customer Portal</span>
+              </div>
+              <p className="text-neutral-500 text-[11px]">
+                Deploy isolated customer portals, delegate partner oversight, and import employee directories with automated SSO.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => setIsAddComingSoonOpen(false)}
+              className="px-6 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold rounded-lg border border-neutral-700 transition-colors cursor-pointer"
+            >
+              Return to Super Admin Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8" id="super_admin_view">
       {/* Dedicated Management Panel Modal for Active Selected Partner or Customer */}
@@ -1868,7 +1946,18 @@ export default function SuperAdminDashboard({
                   RESELLERS ({filteredHoverPartners.length})
                 </span>
               </div>
-              <span className="text-[9px] text-neutral-400 font-mono">Hover & Open</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsAddComingSoonOpen(true);
+                }}
+                className="px-2.5 py-1 text-[10px] font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-md transition-colors shadow-sm flex items-center gap-1 cursor-pointer"
+                title="Add New Customer or Partner"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Add New</span>
+              </button>
             </div>
 
             {/* Search window at the top of hover list */}
@@ -2056,7 +2145,18 @@ export default function SuperAdminDashboard({
                   TOTAL CUSTOMERS ({filteredHoverCustomers.length})
                 </span>
               </div>
-              <span className="text-[9px] text-neutral-400 font-mono">Hover & Select</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsAddComingSoonOpen(true);
+                }}
+                className="px-2.5 py-1 text-[10px] font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-md transition-colors shadow-sm flex items-center gap-1 cursor-pointer"
+                title="Add New Customer or Partner"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Add New</span>
+              </button>
             </div>
 
             {/* Search window at the top of hover list */}
@@ -2372,6 +2472,15 @@ export default function SuperAdminDashboard({
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAddComingSoonOpen(true)}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer flex items-center gap-1.5"
+                title="Add New Customer or Partner"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add New</span>
+              </button>
               {selectedPartnerId && (
                 <button
                   type="button"
@@ -2579,6 +2688,15 @@ export default function SuperAdminDashboard({
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAddComingSoonOpen(true)}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer flex items-center gap-1.5"
+                title="Add New Customer or Partner"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add New</span>
+              </button>
               {selectedCustomerId && (
                 <button
                   type="button"
@@ -2892,9 +3010,7 @@ export default function SuperAdminDashboard({
       {/* Tabs navigation */}
       <div className="flex border-b border-neutral-800 gap-1 overflow-x-auto" id="sa_tabs_container">
         {[
-          { id: 'partners', label: 'Partners Directory', icon: Building2 },
-          { id: 'customers', label: 'Customer Portals', icon: Globe },
-          { id: 'admins', label: 'User & Permissions Delegation', icon: Users },
+          { id: 'admins', label: 'Vizhin Admins', icon: Users },
           { id: 'audit', label: 'Global Audit Trail', icon: FileCheck },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -2915,421 +3031,328 @@ export default function SuperAdminDashboard({
         })}
       </div>
 
-      {/* TAB 1: PARTNERS DIRECTORY */}
-      {activeTab === 'partners' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" id="sa_tab_partners">
-          <div className="lg:col-span-2 space-y-4">
-            {renderActiveSelectionCard()}
-          </div>
 
-          {/* Quick Creator */}
-          <div className="bg-neutral-900/25 border border-neutral-800 rounded-xl p-5 space-y-4">
-            <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-              <Plus className="w-4 h-4 text-emerald-400" /> Setup New Reselling Partner
-            </h3>
-            
-            {pMsg && (
-              <div className="p-2 bg-emerald-950/40 border border-emerald-900 text-emerald-400 rounded text-xs">
-                {pMsg}
-              </div>
-            )}
 
-            <form onSubmit={handleCreatePartner} className="space-y-4 text-xs">
-              <div className="space-y-1">
-                <label className="block text-neutral-450 uppercase font-semibold tracking-wider text-[10px]">Company Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Acuity Group"
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded px-3 py-2 text-neutral-200 placeholder-neutral-700 focus:outline-none focus:border-emerald-500"
-                  value={pName}
-                  onChange={(e) => setPName(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-neutral-450 uppercase font-semibold tracking-wider text-[10px]">Branded domain</label>
-                <input
-                  type="text"
-                  placeholder="e.g. acuity.io"
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded px-3 py-2 text-neutral-200 placeholder-neutral-700 focus:outline-none focus:border-emerald-500"
-                  value={pDomain}
-                  onChange={(e) => setPDomain(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-neutral-450 uppercase font-semibold tracking-wider text-[10px]">Logo URL Address</label>
-                <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/..."
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded px-3 py-2 text-neutral-250 placeholder-neutral-750 focus:outline-none focus:border-emerald-500"
-                  value={pLogo}
-                  onChange={(e) => setPLogo(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-neutral-450 uppercase font-semibold tracking-wider text-[10px]">Brand Accent Color</label>
-                <div className="flex gap-2">
-                  <input
-                    type="color"
-                    className="w-10 h-8 bg-neutral-950 border border-neutral-800 rounded cursor-pointer"
-                    value={pColor}
-                    onChange={(e) => setPColor(e.target.value)}
-                  />
-                  <input
-                    type="text"
-                    className="flex-1 bg-neutral-950 border border-neutral-800 rounded px-3 py-1.5 font-mono text-neutral-200 focus:outline-none focus:border-emerald-500"
-                    value={pColor}
-                    onChange={(e) => setPColor(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-gradient-to-r from-emerald-600 to-[#0D5C46] hover:from-emerald-500 hover:to-[#0A4837] text-white font-semibold py-2 rounded transition-colors cursor-pointer block mt-2 shadow-md shadow-emerald-950/40 border border-emerald-500/30"
-              >
-                Assemble Partner Framework
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: CUSTOMER PORTALS */}
-      {activeTab === 'customers' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" id="sa_tab_customers">
-          <div className="lg:col-span-2 space-y-4">
-            {renderActiveSelectionCard()}
-          </div>
-
-          {/* Quick Creator */}
-          <div className="bg-neutral-900/25 border border-neutral-800 rounded-xl p-5 space-y-4">
-            <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-              <Plus className="w-4 h-4 text-blue-400" /> Register Customer Portal
-            </h3>
-            
-            {cMsg && (
-              <div className="p-2 bg-emerald-950/40 border border-emerald-900 text-emerald-400 rounded text-xs">
-                {cMsg}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateCustomer} className="space-y-4 text-xs">
-              <div className="space-y-1">
-                <label className="block text-neutral-450 uppercase font-semibold tracking-wider text-[10px]">Customer Brand Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Zenith Analytics"
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded px-3 py-2 text-neutral-200 placeholder-neutral-700 focus:outline-none focus:border-blue-500"
-                  value={cName}
-                  onChange={(e) => setCName(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-neutral-450 uppercase font-semibold tracking-wider text-[10px]">Delegate Parent Partner</label>
-                <select
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded px-3 py-2 text-neutral-400 focus:outline-none focus:border-blue-500 cursor-pointer"
-                  value={cPartner}
-                  onChange={(e) => setCPartner(e.target.value)}
-                >
-                  <option value="">Direct/Standalone Account (No Partner Owner)</option>
-                  {partners.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} (Reseller)</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-neutral-450 uppercase font-semibold tracking-wider text-[10px]">Custome Logo Url</label>
-                <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/..."
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded px-3 py-2 text-neutral-250 placeholder-neutral-750 focus:outline-none focus:border-blue-500"
-                  value={cLogo}
-                  onChange={(e) => setCLogo(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-neutral-450 uppercase font-semibold tracking-wider text-[10px]">Identity Accent Color</label>
-                <div className="flex gap-2">
-                  <input
-                    type="color"
-                    className="w-10 h-8 bg-neutral-950 border border-neutral-800 rounded cursor-pointer"
-                    value={cColor}
-                    onChange={(e) => setCColor(e.target.value)}
-                  />
-                  <input
-                    type="text"
-                    className="flex-1 bg-neutral-950 border border-neutral-800 rounded px-3 py-1.5 font-mono text-neutral-200 focus:outline-none focus:border-blue-500"
-                    value={cColor}
-                    onChange={(e) => setCColor(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 rounded transition-colors cursor-pointer block mt-2"
-              >
-                Provision Isolated Customer
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: USER & PERMISSIONS DELEGATION */}
+      {/* VIZHIN ADMINS SECTION */}
       {activeTab === 'admins' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" id="sa_tab_admins">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="bg-neutral-950 rounded-xl border border-neutral-800 overflow-hidden">
-              <div className="p-4 border-b border-neutral-850 bg-neutral-900/40 flex justify-between items-center">
-                <h3 className="text-sm font-semibold text-white">Delegated Profile Credentials (Supabase Profiles)</h3>
-                <span className="text-xs text-neutral-500 font-mono">Allows More Than One Administrator Per Account</span>
+        <div className="space-y-6" id="sa_tab_vizhin_admins">
+          {/* Header row with Title, Summary, and Add Admin Button */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-neutral-900/60 border border-neutral-800 p-5 rounded-xl">
+            <div>
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold text-white">Vizhin Admins</h3>
+                <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  {users.filter(u => u.email.toLowerCase().includes('vizhin.co')).length} Active Personnel
+                </span>
               </div>
-              <div className="divide-y divide-neutral-850">
-                {users.map(u => {
-                  const partner = partners.find(p => p.id === u.partnerId);
-                  const cust = customers.find(c => c.id === u.customerId);
-                  return (
-                    <div key={u.id} className="p-4 flex items-center justify-between hover:bg-neutral-900/30 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <img src={u.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=60&h=60&fit=crop'} alt="" className="w-9 h-9 rounded-full object-cover bg-neutral-800 border border-neutral-700" referrerPolicy="no-referrer" />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-sm text-neutral-200">{u.name}</h4>
-                            <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase font-mono font-medium ${
-                              u.role === 'SUPER_ADMIN' ? 'bg-red-950 text-red-400 border border-red-900' :
-                              u.role === 'PARTNER_ADMIN' ? 'bg-emerald-950 text-emerald-400 border border-emerald-900' :
-                              'bg-teal-950 text-teal-300 border border-teal-900'
-                            }`}>
-                              {u.role.replace('_', ' ')}
-                            </span>
-                          </div>
-                          <div className="text-xs text-neutral-500 mt-0.5">
-                            {u.email} • Assigned to:{' '}
-                            {u.role === 'SUPER_ADMIN' && <strong className="text-red-400">Everything (Tenant Owner)</strong>}
-                            {u.role === 'PARTNER_ADMIN' && partner && <span className="text-emerald-400 font-semibold">{partner.name}</span>}
-                            {u.role === 'CUSTOMER_ADMIN' && cust && <span className="text-teal-300 font-semibold">{cust.name}</span>}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Delete profile credentials unless it is the root super user */}
-                      {u.id !== 'user_super' ? (
-                        <button
-                          onClick={() => deleteUser(u.id, u.name)}
-                          className="p-1.5 rounded bg-neutral-950 hover:bg-red-950/40 text-neutral-600 hover:text-red-400 border border-neutral-800 hover:border-red-900 transition-all cursor-pointer"
-                          title="Revoke Admin permissions"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      ) : (
-                        <span className="text-[10px] uppercase font-mono text-neutral-600 tracking-wider">Unrevokable</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              <p className="text-xs text-neutral-400 mt-1">
+                Internal Vizhin personnel roster with multi-tenant authority and delegated partner governance.
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowVizhinAddAdminModal(prev => !prev);
+                setSetupAdminComingSoonMsg(null);
+              }}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer flex items-center gap-2 self-start sm:self-auto"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>{showVizhinAddAdminModal ? 'Close Form' : 'Add Admin'}</span>
+            </button>
           </div>
 
-          {/* User Creator Form */}
-          <div className="bg-neutral-900/25 border border-neutral-800 rounded-xl p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-neutral-850 pb-2">
-              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                <Plus className="w-4 h-4 text-emerald-400" /> Delegate Credentials
-              </h3>
-              <div className="flex bg-neutral-950 p-0.5 rounded-lg border border-neutral-800">
-                <button
-                  type="button"
-                  onClick={() => setDelegationMode('single')}
-                  className={`px-2.5 py-1 text-[10px] font-semibold rounded-md transition-all cursor-pointer ${
-                    delegationMode === 'single' ? 'bg-neutral-800 text-white' : 'text-neutral-500 hover:text-neutral-300'
-                  }`}
-                >
-                  Single Profile
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDelegationMode('bulk')}
-                  className={`px-2.5 py-1 text-[10px] font-semibold rounded-md transition-all cursor-pointer ${
-                    delegationMode === 'bulk' ? 'bg-neutral-800 text-white' : 'text-neutral-500 hover:text-neutral-300'
-                  }`}
-                >
-                  Bulk CSV Import
-                </button>
+          {/* Setup Admin Inline Coming Soon Feedback */}
+          {setupAdminComingSoonMsg && (
+            <div className="p-4 bg-emerald-950/60 border border-emerald-500/50 rounded-xl text-xs text-emerald-200 flex items-start justify-between shadow-lg">
+              <div className="flex items-start gap-2.5">
+                <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="font-semibold text-white">Setup Admin — Coming Soon</strong>
+                  <p className="text-emerald-300/90 mt-0.5">{setupAdminComingSoonMsg}</p>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setSetupAdminComingSoonMsg(null)}
+                className="text-neutral-400 hover:text-white cursor-pointer ml-4"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            
-            {uMsg && (
-              <div className="p-2.5 bg-neutral-950/80 border border-neutral-800 text-emerald-400 rounded text-xs leading-relaxed text-center font-medium">
-                {uMsg}
-              </div>
-            )}
+          )}
 
-            {delegationMode === 'single' ? (
-              <form onSubmit={handleCreateUser} className="space-y-4 text-xs">
-                <div className="space-y-1">
-                  <label className="block text-neutral-450 uppercase font-semibold tracking-wider text-[10px]">User Full Name</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Richard Reifel Co-Admin"
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded px-3 py-2 text-neutral-200 placeholder-neutral-700 focus:outline-none focus:border-emerald-500"
-                    value={uName}
-                    onChange={(e) => setUName(e.target.value)}
-                  />
+          {/* Add Admin Form */}
+          {showVizhinAddAdminModal && (
+            <div className="bg-neutral-900/90 border border-neutral-700/80 rounded-xl p-5 sm:p-6 shadow-xl relative">
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-800 mb-4">
+                <div className="flex items-center gap-2">
+                  <UserPlus className="w-4 h-4 text-emerald-400" />
+                  <h4 className="text-sm font-bold text-white">Add Vizhin Admin</h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowVizhinAddAdminModal(false)}
+                  className="text-neutral-400 hover:text-white p-1 rounded hover:bg-neutral-800 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const roleLabel = 
+                    vizhinRole === 'SUPER_ADMIN' ? 'Super Admin' :
+                    vizhinRole === 'PARTNER_ADMIN' ? 'Partner_Admin' : 'Customer_Admin';
+                  const partnerNames = partners
+                    .filter(p => vizhinSelectedPartners.includes(p.id))
+                    .map(p => p.name)
+                    .join(', ');
+                  const delegationInfo = partnerNames ? ` delegated to ${partnerNames}` : '';
+                  setSetupAdminComingSoonMsg(
+                    `Coming Soon: Automated admin setup and credential provisioning for ${vizhinFirstName || 'Admin'} ${vizhinLastName} (${vizhinEmail}) as ${roleLabel}${delegationInfo} will be available in the next release.`
+                  );
+                }}
+                className="space-y-4 text-xs"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="block text-neutral-400 uppercase font-semibold tracking-wider text-[10px]">First Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Richard"
+                      value={vizhinFirstName}
+                      onChange={(e) => setVizhinFirstName(e.target.value)}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white placeholder-neutral-600 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-neutral-400 uppercase font-semibold tracking-wider text-[10px]">Last Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Reifel"
+                      value={vizhinLastName}
+                      onChange={(e) => setVizhinLastName(e.target.value)}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white placeholder-neutral-600 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-neutral-450 uppercase font-semibold tracking-wider text-[10px]">Email Address</label>
+                  <label className="block text-neutral-400 uppercase font-semibold tracking-wider text-[10px]">Email Address</label>
                   <input
                     type="email"
                     required
-                    placeholder="e.g. admin@partner.co"
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded px-3 py-2 text-neutral-200 placeholder-neutral-700 focus:outline-none focus:border-emerald-500"
-                    value={uEmail}
-                    onChange={(e) => setUEmail(e.target.value)}
+                    placeholder="e.g. admin@vizhin.co"
+                    value={vizhinEmail}
+                    onChange={(e) => setVizhinEmail(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white placeholder-neutral-600 focus:outline-none focus:border-emerald-500"
                   />
+                  <p className="text-[10px] text-neutral-500">Must be a valid @vizhin.co corporate account email.</p>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="block text-neutral-450 uppercase font-semibold tracking-wider text-[10px]">Role Designation Tiers</label>
-                  <select
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded px-3 py-2 text-neutral-400 focus:outline-none focus:border-emerald-500 cursor-pointer"
-                    value={uRole}
-                    onChange={(e) => setURole(e.target.value as any)}
-                  >
-                    <option value="PARTNER_ADMIN">PARTNER_ADMIN (Reselling Tenant Owner)</option>
-                    <option value="CUSTOMER_ADMIN">CUSTOMER_ADMIN (Co-Branded Agency Portal)</option>
-                    <option value="SUPER_ADMIN">SUPER_ADMIN (God Rights Tier)</option>
-                  </select>
-                </div>
-
-                {uRole === 'PARTNER_ADMIN' && (
-                  <div className="space-y-1">
-                    <label className="block text-neutral-450 uppercase font-semibold tracking-wider text-[10px]">Select Partner Scope</label>
-                    <select
-                      required
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded px-3 py-2 text-neutral-400 focus:outline-none focus:border-emerald-500 cursor-pointer"
-                      value={uPartnerId}
-                      onChange={(e) => setUPartnerId(e.target.value)}
-                    >
-                      <option value="">-- Choose Partner --</option>
-                      {partners.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {uRole === 'CUSTOMER_ADMIN' && (
-                  <div className="space-y-1">
-                    <label className="block text-neutral-450 uppercase font-semibold tracking-wider text-[10px]">Select Customer Scope</label>
-                    <select
-                      required
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded px-3 py-2 text-neutral-400 focus:outline-none focus:border-emerald-500 cursor-pointer"
-                      value={uCustomerId}
-                      onChange={(e) => setUCustomerId(e.target.value)}
-                    >
-                      <option value="">-- Choose Customer --</option>
-                      {customers.map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-emerald-600 to-[#0D5C46] hover:from-emerald-500 hover:to-[#0A4837] text-white font-semibold py-2 rounded transition-colors cursor-pointer block mt-2 shadow-md shadow-emerald-950/40 border border-emerald-500/30"
-                >
-                  Provision Role Profile
-                </button>
-              </form>
-            ) : (
-              <div className="space-y-4 text-xs font-sans">
-                <div
-                  className={`border-2 border-dashed rounded-xl p-6 text-center transition-all ${
-                    dragActive
-                      ? 'border-emerald-500 bg-emerald-950/10'
-                      : 'border-neutral-800 hover:border-neutral-700 bg-neutral-950/50'
-                  }`}
-                  onDragEnter={(e) => {
-                    e.preventDefault();
-                    setDragActive(true);
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragActive(true);
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault();
-                    setDragActive(false);
-                  }}
-                  onDrop={handleFileDrop}
-                >
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <span className="text-2xl">📥</span>
-                    <p className="text-neutral-300 font-medium">Drag & Drop your CSV file here</p>
-                    <p className="text-[10px] text-neutral-500">Supported formats: .csv, .txt</p>
-                    <div className="relative mt-1">
-                      <input
-                        type="file"
-                        accept=".csv,.txt"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                        id="bulk-csv-upload-input"
-                      />
+                {/* 3 Role Options */}
+                <div className="space-y-2 pt-1">
+                  <label className="block text-neutral-400 uppercase font-semibold tracking-wider text-[10px]">
+                    Role Designation (Choose 1 of 3)
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {[
+                      {
+                        role: 'SUPER_ADMIN',
+                        title: 'Super Admin',
+                        desc: 'Full tenant authority over all partners, customers, and configuration.',
+                        badgeColor: 'text-red-400'
+                      },
+                      {
+                        role: 'PARTNER_ADMIN',
+                        title: 'Partner_Admin',
+                        desc: 'Delegated authority over 1 or multiple designated reseller partners.',
+                        badgeColor: 'text-blue-400'
+                      },
+                      {
+                        role: 'CUSTOMER_ADMIN',
+                        title: 'Customer_Admin',
+                        desc: 'Delegated authority over 1 or multiple customer organizations.',
+                        badgeColor: 'text-emerald-400'
+                      }
+                    ].map((opt) => (
                       <label
-                        htmlFor="bulk-csv-upload-input"
-                        className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 rounded text-[10px] font-semibold cursor-pointer transition-colors block"
+                        key={opt.role}
+                        className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                          vizhinRole === opt.role
+                            ? 'border-emerald-500 bg-emerald-950/30 shadow-md ring-1 ring-emerald-500/50'
+                            : 'border-neutral-800 bg-neutral-950 hover:border-neutral-700'
+                        }`}
                       >
-                        Choose File
+                        <div className="flex items-center gap-2 mb-2">
+                          <input
+                            type="radio"
+                            name="vizhinAdminRole"
+                            value={opt.role}
+                            checked={vizhinRole === opt.role}
+                            onChange={() => setVizhinRole(opt.role as any)}
+                            className="accent-emerald-500 cursor-pointer"
+                          />
+                          <span className={`font-bold text-xs ${opt.badgeColor}`}>{opt.title}</span>
+                        </div>
+                        <p className="text-[11px] text-neutral-400 leading-tight">{opt.desc}</p>
                       </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Delegate to 1 or Multiple Partners */}
+                {(vizhinRole === 'PARTNER_ADMIN' || vizhinRole === 'CUSTOMER_ADMIN') && (
+                  <div className="space-y-2 pt-2 p-3.5 bg-neutral-950 rounded-xl border border-neutral-800">
+                    <label className="block text-neutral-300 uppercase font-semibold tracking-wider text-[10px]">
+                      Delegate to 1 or Multiple Partners
+                    </label>
+                    <p className="text-[11px] text-neutral-400">
+                      Check each reseller partner this administrator will be delegated to govern:
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                      {partners.map(p => {
+                        const isChecked = vizhinSelectedPartners.includes(p.id);
+                        return (
+                          <label
+                            key={p.id}
+                            className={`flex items-center gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
+                              isChecked
+                                ? 'border-emerald-500/60 bg-emerald-950/30 text-white'
+                                : 'border-neutral-800 hover:border-neutral-700 text-neutral-300'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setVizhinSelectedPartners(prev => [...prev, p.id]);
+                                } else {
+                                  setVizhinSelectedPartners(prev => prev.filter(id => id !== p.id));
+                                }
+                              }}
+                              className="accent-emerald-500 rounded cursor-pointer"
+                            />
+                            <Building2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                            <span className="font-medium">{p.name}</span>
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
-                </div>
+                )}
 
-                <div className="relative flex py-2 items-center text-neutral-600">
-                  <div className="flex-grow border-t border-neutral-850"></div>
-                  <span className="flex-shrink mx-3 text-[10px] uppercase font-bold tracking-widest font-mono text-neutral-500">Or Paste Raw Data</span>
-                  <div className="flex-grow border-t border-neutral-850"></div>
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowVizhinAddAdminModal(false)}
+                    className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shadow-md shadow-emerald-950/40 cursor-pointer transition-colors flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Setup Admin</span>
+                  </button>
                 </div>
+              </form>
+            </div>
+          )}
 
-                <div className="space-y-1.5">
-                  <label className="block text-neutral-400 uppercase tracking-wider text-[9px] font-bold">CSV/Text Rows (Name, Email, Role)</label>
-                  <textarea
-                    rows={4}
-                    placeholder="John Doe, john@acuity.com, PARTNER_ADMIN&#10;Alice Smith, alice@apex.com, CUSTOMER_ADMIN"
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2.5 text-neutral-200 font-mono text-xs focus:outline-none focus:border-emerald-500 placeholder-neutral-750"
-                    value={bulkText}
-                    onChange={(e) => setBulkText(e.target.value)}
-                  />
-                  <span className="text-[10px] text-neutral-550 block">Columns order: Full Name, Email, Role (SUPER_ADMIN, PARTNER_ADMIN, or CUSTOMER_ADMIN)</span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleBulkImport(bulkText)}
-                  disabled={!bulkText.trim()}
-                  className={`w-full font-semibold py-2 rounded transition-colors block ${
-                    bulkText.trim()
-                      ? 'bg-gradient-to-r from-emerald-600 to-[#0D5C46] hover:from-emerald-500 hover:to-[#0A4837] text-white cursor-pointer shadow-md shadow-emerald-950/40 border border-emerald-500/30'
-                      : 'bg-neutral-900 text-neutral-500 border border-neutral-850 cursor-not-allowed'
-                  }`}
-                >
-                  Parse & Import Rows
-                </button>
+          {/* Vizhin Admins Directory Roster */}
+          <div className="bg-neutral-950 rounded-xl border border-neutral-800 overflow-hidden shadow-sm">
+            <div className="p-4 border-b border-neutral-850 bg-neutral-900/40 flex justify-between items-center">
+              <div>
+                <h4 className="text-xs font-bold text-white uppercase font-mono tracking-wider">
+                  Vizhin Corporate Administrators ({users.filter(u => u.email.toLowerCase().includes('vizhin.co')).length})
+                </h4>
+                <p className="text-[11px] text-neutral-400 mt-0.5">
+                  Displaying exclusively admins with authorized @vizhin.co credentials
+                </p>
               </div>
-            )}
+              <span className="text-[10px] text-neutral-500 font-mono">Domain: vizhin.co</span>
+            </div>
+
+            <div className="divide-y divide-neutral-850">
+              {users
+                .filter(u => u.email.toLowerCase().includes('vizhin.co'))
+                .map(u => {
+                  const delegatedPartners = partners.filter(p => 
+                    (u.assignedPartnerIds && u.assignedPartnerIds.includes(p.id)) ||
+                    u.partnerId === p.id
+                  );
+
+                  return (
+                    <div key={u.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-neutral-900/30 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={u.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=60&h=60&fit=crop'}
+                          alt=""
+                          className="w-10 h-10 rounded-full object-cover bg-neutral-800 border border-neutral-700 shrink-0"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h5 className="font-semibold text-sm text-neutral-200">{u.name}</h5>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-mono font-bold tracking-wider ${
+                              u.role === 'SUPER_ADMIN' ? 'bg-red-950/80 text-red-400 border border-red-800' :
+                              u.role === 'PARTNER_ADMIN' || u.role === 'PARTNER_ADMIN_GLOBAL' ? 'bg-blue-950/80 text-blue-400 border border-blue-800' :
+                              'bg-emerald-950/80 text-emerald-400 border border-emerald-800'
+                            }`}>
+                              {u.role === 'SUPER_ADMIN' ? 'Super Admin' :
+                               u.role === 'PARTNER_ADMIN' || u.role === 'PARTNER_ADMIN_GLOBAL' ? 'Partner_Admin' :
+                               'Customer_Admin'}
+                            </span>
+                          </div>
+                          <div className="text-xs text-neutral-400 mt-0.5 flex items-center gap-2">
+                            <span>{u.email}</span>
+                            <span className="text-neutral-600">•</span>
+                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-mono">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Active
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Partner Delegation Display */}
+                      <div className="flex flex-col md:items-end gap-1">
+                        <span className="text-[10px] text-neutral-500 uppercase font-mono tracking-wider font-semibold">
+                          Partner Delegation
+                        </span>
+                        {u.role === 'SUPER_ADMIN' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-red-950/40 text-red-300 border border-red-900/60">
+                            <Shield className="w-3.5 h-3.5 text-red-400" />
+                            All Tenants & Resellers (Super Admin)
+                          </span>
+                        ) : delegatedPartners.length > 0 ? (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {delegatedPartners.map(p => (
+                              <span
+                                key={p.id}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-neutral-900 border border-neutral-700 text-blue-300"
+                              >
+                                <Building2 className="w-3 h-3 text-blue-400" />
+                                {p.name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-neutral-500 italic">No partners delegated</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
           </div>
         </div>
       )}

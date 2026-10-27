@@ -26,6 +26,7 @@ export interface PortalUser {
   partnerId: string | null; // Set if role is PARTNER_ADMIN
   customerId: string | null; // Set if role is CUSTOMER_ADMIN
   assignedCustomerIds?: string[]; // Array of customer/sub-account IDs this administrator has access to
+  assignedPartnerIds?: string[]; // Array of partner IDs this administrator is delegated to
   avatarUrl?: string;
   isActive: boolean;
   createdAt: string;
