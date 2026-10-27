@@ -64,6 +64,10 @@ export default function PartnerDashboard({
   // Selected customer ID (null = show searchable customer list)
   const [selectedCustomerPulldownId, setSelectedCustomerPulldownId] = useState<string | null>(null);
 
+  // Selected administrator ID (null = show searchable administrator list)
+  const [selectedAdminPulldownId, setSelectedAdminPulldownId] = useState<string | null>(null);
+  const [adminSearch, setAdminSearch] = useState('');
+
   // Quick Add Admin modal from Assigned Administrator section
   const [showAddAdminModal, setShowAddAdminModal] = useState<boolean>(false);
   const [modalAdminTargetCustomer, setModalAdminTargetCustomer] = useState<string | null>(null);
@@ -327,8 +331,15 @@ export default function PartnerDashboard({
   // Selected customer (null if viewing customer list)
   const selectedCustomer = myCustomers.find(c => c.id === selectedCustomerPulldownId) || null;
 
-  // Administrators (all displayed cleanly without slice)
-  const displayedAdmins = partnerAdmins;
+  // Filtered administrators matching search
+  const filteredAdmins = partnerAdmins.filter(a => 
+    !adminSearch.trim() ||
+    a.name.toLowerCase().includes(adminSearch.toLowerCase().trim()) ||
+    a.email.toLowerCase().includes(adminSearch.toLowerCase().trim())
+  );
+
+  // Selected administrator (null if viewing admin list)
+  const selectedAdmin = partnerAdmins.find(a => a.id === selectedAdminPulldownId) || null;
 
   // Render standalone customer dashboard if hotlinked without external router
   if (viewingCustomer) {
@@ -417,53 +428,6 @@ export default function PartnerDashboard({
         </div>
       </div>
 
-      {/* STATS ROW */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4" id="partner_stats">
-        <div className="bg-neutral-905 p-4 rounded-xl border border-neutral-800 flex items-center justify-between">
-          <div>
-            <span className="text-xs text-neutral-500 font-mono">RESELLER CUSTOMERS</span>
-            <div className="text-2xl font-bold text-white mt-1">{myCustomers.length} Customer{myCustomers.length === 1 ? '' : 's'}</div>
-            <div className="text-[11px] text-neutral-400 mt-0.5">Under {currentPartner.name}</div>
-          </div>
-          <div className="p-3 bg-neutral-800/50 rounded-lg text-blue-400">
-            <Building2 className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="bg-neutral-905 p-4 rounded-xl border border-neutral-800 flex items-center justify-between">
-          <div>
-            <span className="text-xs text-neutral-500 font-mono">RESELLER ADMINISTRATORS</span>
-            <div className="text-2xl font-bold text-white mt-1">
-              {partnerAdmins.length} Administrators
-            </div>
-            <div className="text-[11px] text-emerald-400 mt-0.5 flex items-center gap-1.5">
-              <span>{partnerAdmins.filter(a => a.role === 'PARTNER_ADMIN_GLOBAL').length} Global</span>
-              <span>•</span>
-              <span>{partnerAdmins.filter(a => a.role === 'PARTNER_ADMIN').length} Standard</span>
-            </div>
-          </div>
-          <div className="p-3 bg-neutral-800/50 rounded-lg text-emerald-400">
-            <Users className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="bg-neutral-905 p-4 rounded-xl border border-neutral-800 flex items-center justify-between">
-          <div>
-            <span className="text-xs font-mono text-purple-400">ORGANIZATION DOMAIN</span>
-            <div className="text-sm font-semibold text-neutral-300 mt-1 truncate max-w-[180px]">
-              {currentPartner.domain || 'Direct Reseller'}
-            </div>
-            <div className="text-[11px] text-neutral-400 mt-0.5 flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: currentPartner.accentColor }} />
-              Theme accent: {currentPartner.accentColor}
-            </div>
-          </div>
-          <div className="p-2.5 rounded-lg border border-neutral-850 bg-neutral-950 text-neutral-400 flex items-center gap-1 text-[11px] font-mono">
-            Active Tier
-          </div>
-        </div>
-      </div>
-
       {/* TOP TAB BAR */}
       <div className="flex bg-neutral-950 p-1.5 rounded-xl border border-neutral-800 max-w-2xl flex-wrap gap-1" id="partner_tab_bar">
         {/* CUSTOMERS PULLDOWN TAB */}
@@ -505,22 +469,46 @@ export default function PartnerDashboard({
           <ChevronDown className="w-3.5 h-3.5 text-neutral-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
 
-        <button
-          onClick={() => setActiveTab('administrators')}
-          className={`flex-1 text-center py-2 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 ${
-            activeTab === 'administrators' 
-              ? 'bg-neutral-850 text-white shadow-md border border-neutral-750' 
-              : 'text-neutral-400 hover:text-white hover:bg-neutral-900/50'
-          }`}
-          id="partner_tab_btn_administrators"
-        >
-          <Users className="w-4 h-4 text-emerald-450" />
-          <span>Administrators</span>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-950 text-emerald-300 font-mono border border-emerald-800/60 font-bold">
-            ({partnerAdmins.length})
-          </span>
-        </button>
+        {/* ADMINISTRATORS PULLDOWN TAB */}
+        <div className="relative flex-1 min-w-[210px]" id="partner_tab_administrators_container">
+          <select
+            value={activeTab === 'administrators' ? (selectedAdminPulldownId || 'all') : 'all'}
+            onChange={(e) => {
+              const val = e.target.value;
+              setActiveTab('administrators');
+              if (val === 'all') {
+                setSelectedAdminPulldownId(null);
+              } else {
+                setSelectedAdminPulldownId(val);
+              }
+            }}
+            onClick={() => {
+              if (activeTab !== 'administrators') {
+                setActiveTab('administrators');
+              }
+            }}
+            className={`w-full py-2 pl-9 pr-8 text-xs font-semibold rounded-lg transition-all cursor-pointer appearance-none border ${
+              activeTab === 'administrators' 
+                ? 'bg-neutral-850 text-white shadow-md border-neutral-750' 
+                : 'bg-transparent text-neutral-400 hover:text-white hover:bg-neutral-900/50 border-transparent'
+            }`}
+            id="partner_tab_btn_administrators"
+            title="Administrators list or select specific administrator"
+          >
+            <option value="all" className="bg-neutral-900 text-white font-bold">
+              Administrators ({partnerAdmins.length})
+            </option>
+            {partnerAdmins.map(a => (
+              <option key={a.id} value={a.id} className="bg-neutral-900 text-white font-medium">
+                {a.name} ({a.role === 'PARTNER_ADMIN_GLOBAL' ? 'Global' : 'Standard'})
+              </option>
+            ))}
+          </select>
+          <Users className="w-4 h-4 text-emerald-450 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <ChevronDown className="w-3.5 h-3.5 text-neutral-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        </div>
 
+        {/* SHOW ALL TAB */}
         <button
           onClick={() => setActiveTab('all')}
           className={`flex-1 text-center py-2 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 ${
@@ -1025,7 +1013,7 @@ export default function PartnerDashboard({
             {/* Subtext info bar */}
             <div className="pt-2.5 border-t border-emerald-900/40 flex items-center justify-between text-[11px] font-mono text-neutral-400">
               <span className="bg-neutral-950/80 px-2.5 py-1 rounded border border-neutral-800 text-neutral-300">
-                Showing <strong className="text-white font-bold">{displayedAdmins.length}</strong> administrator{displayedAdmins.length === 1 ? '' : 's'}
+                Showing <strong className="text-white font-bold">{partnerAdmins.length}</strong> administrator{partnerAdmins.length === 1 ? '' : 's'}
               </span>
               <span className="text-emerald-450 font-semibold hidden sm:inline">
                 Vertical List • Hotlinks to Customer Dashboards
@@ -1033,15 +1021,152 @@ export default function PartnerDashboard({
             </div>
           </div>
 
-          {/* VERTICAL LIST OF ADMINISTRATOR CARDS */}
-          <div className="flex flex-col space-y-4" id="reseller_admins_vertical_list">
-            {displayedAdmins.map((admin, idx) => {
-              const isGlobal = admin.role === 'PARTNER_ADMIN_GLOBAL';
-              const assignedCusts = isGlobal 
-                ? myCustomers 
-                : myCustomers.filter(c => (admin.assignedCustomerIds || []).includes(c.id));
-              const isExpanded = !!expandedAdminAccounts[admin.id];
-              const accentColor = isGlobal ? '#10b981' : '#3b82f6';
+          {/* SEARCH BAR (Prominent search above administrator list) */}
+          <div className="bg-neutral-950/80 p-3 rounded-xl border border-neutral-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search administrators by name or email (matches any part)..."
+                value={adminSearch}
+                onChange={(e) => setAdminSearch(e.target.value)}
+                className="w-full bg-neutral-900 border border-neutral-750 rounded-lg pl-9 pr-9 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                id="search_admins_input"
+              />
+              {adminSearch && (
+                <button
+                  type="button"
+                  onClick={() => setAdminSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white p-0.5 cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <span className="text-[11px] font-mono text-neutral-400 shrink-0">
+              Showing {filteredAdmins.length} of {partnerAdmins.length} Administrators
+            </span>
+          </div>
+
+          {/* CONDITIONAL: IF NO ADMINISTRATOR SELECTED, SHOW SEARCHABLE LIST; IF SELECTED, SHOW FULL DETAIL CARD */}
+          {!selectedAdmin ? (
+            <div className="space-y-3" id="reseller_admins_selection_list">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs text-neutral-400 font-medium">
+                  Select an administrator below or choose from the top pulldown to view their permissions:
+                </span>
+              </div>
+
+              {filteredAdmins.length === 0 ? (
+                <div className="p-12 text-center bg-neutral-950 border border-dashed border-neutral-800 rounded-xl">
+                  <Users className="w-8 h-8 text-neutral-600 mx-auto mb-2" />
+                  <h4 className="text-sm font-semibold text-neutral-400">No Matching Administrators Found</h4>
+                  <p className="text-xs text-neutral-500 mt-1">
+                    {adminSearch ? `No administrators matched "${adminSearch}".` : 'No administrators are registered under this reseller yet.'}
+                  </p>
+                  {adminSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setAdminSearch('')}
+                      className="mt-3 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 rounded-lg text-xs font-semibold border border-neutral-800 cursor-pointer"
+                    >
+                      Clear Search Filter
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-2.5">
+                  {filteredAdmins.map((admin) => {
+                    const isGlobal = admin.role === 'PARTNER_ADMIN_GLOBAL';
+                    const assignedCusts = isGlobal 
+                      ? myCustomers 
+                      : myCustomers.filter(c => (admin.assignedCustomerIds || []).includes(c.id));
+                    const accentColor = isGlobal ? '#10b981' : '#3b82f6';
+                    return (
+                      <div
+                        key={admin.id}
+                        onClick={() => setSelectedAdminPulldownId(admin.id)}
+                        className="group p-3.5 rounded-xl bg-neutral-905 border border-neutral-800 hover:border-emerald-500/60 hover:bg-neutral-850 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm"
+                        style={{ borderLeft: `4px solid ${accentColor}` }}
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="relative shrink-0">
+                            <img
+                              src={admin.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&q=80'}
+                              alt={admin.name}
+                              className="w-10 h-10 rounded-full object-cover border border-neutral-700"
+                              referrerPolicy="no-referrer"
+                            />
+                            <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-neutral-950 ${
+                              admin.isActive ? 'bg-emerald-500' : 'bg-rose-500'
+                            }`} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="text-sm font-bold text-white group-hover:text-emerald-400 transition-colors truncate">
+                                {admin.name}
+                              </h4>
+                              <span className={`text-[9px] px-2 py-0.5 rounded font-mono font-bold ${
+                                isGlobal 
+                                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' 
+                                  : 'bg-blue-950 text-blue-300 border border-blue-800'
+                              }`}>
+                                {isGlobal ? 'Partner_Admin_Global' : 'Partner_Admin'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] text-neutral-400 font-mono mt-0.5">
+                              <span>{admin.email}</span>
+                              <span>•</span>
+                              <span className="text-neutral-300">
+                                {isGlobal ? 'All Customers (Global)' : `${assignedCusts.length} Customer Account${assignedCusts.length === 1 ? '' : 's'}`}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedAdminPulldownId(admin.id)}
+                            className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
+                          >
+                            <span>Select Administrator</span>
+                            <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4" id="reseller_selected_admin_view">
+              <div className="flex items-center justify-between pb-2 border-b border-neutral-800">
+                <button
+                  type="button"
+                  onClick={() => setSelectedAdminPulldownId(null)}
+                  className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 cursor-pointer bg-neutral-900 hover:bg-neutral-850 px-3 py-1.5 rounded-lg border border-neutral-800 transition-colors"
+                  id="btn_back_to_admin_list"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>← Back to Administrators List ({partnerAdmins.length})</span>
+                </button>
+                <span className="text-xs text-neutral-400 font-mono">
+                  Viewing Selected: <strong className="text-white">{selectedAdmin.name}</strong>
+                </span>
+              </div>
+
+              {/* SELECTED ADMINISTRATOR FULL DETAIL CARD */}
+              {[selectedAdmin].map((admin) => {
+                const isGlobal = admin.role === 'PARTNER_ADMIN_GLOBAL';
+                const assignedCusts = isGlobal 
+                  ? myCustomers 
+                  : myCustomers.filter(c => (admin.assignedCustomerIds || []).includes(c.id));
+                const isExpanded = !!expandedAdminAccounts[admin.id];
+                const accentColor = isGlobal ? '#10b981' : '#3b82f6';
+                const adminIndex = partnerAdmins.findIndex(a => a.id === admin.id);
 
               return (
                 <div 
@@ -1060,7 +1185,7 @@ export default function PartnerDashboard({
                   <div className="px-4 py-2 bg-neutral-900/70 border-b border-neutral-850 flex items-center justify-between text-[11px] font-mono">
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full inline-block shadow-xs" style={{ backgroundColor: accentColor }} />
-                      <span className="font-bold text-white tracking-wider">ADMINISTRATOR #{idx + 1}</span>
+                      <span className="font-bold text-white tracking-wider">ADMINISTRATOR #{adminIndex >= 0 ? adminIndex + 1 : 1}</span>
                       <span className="text-neutral-600">•</span>
                       <span className="text-neutral-400">
                         {isGlobal ? 'Global Oversight Across All Customers' : 'Scoped Sub-Account Permissions'}
@@ -1341,19 +1466,9 @@ export default function PartnerDashboard({
                 </div>
               );
             })}
-
-            {displayedAdmins.length === 0 && (
-              <div className="p-12 text-center bg-neutral-950 border border-dashed border-neutral-800 rounded-xl">
-                <Users className="w-8 h-8 text-neutral-600 mx-auto mb-2" />
-                <h4 className="text-sm font-semibold text-neutral-400">No Administrators Found</h4>
-                <p className="text-xs text-neutral-500 mt-1">
-                  Add administrators using the button above.
-                </p>
-              </div>
-            )}
           </div>
-
-        </section>
+        )}
+      </section>
       )}
 
 
