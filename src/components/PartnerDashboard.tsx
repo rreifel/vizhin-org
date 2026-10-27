@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Partner, Customer, PortalUser, AuditLog, Lead, Task } from '../types';
 import { 
-  Plus, Users, Globe, Building2, Sliders, CheckCircle2, 
+  Plus, Users, Globe, Building2, CheckCircle2, 
   ShieldCheck, UserCheck, UserX, Check, X, Search, 
   Crown, Star, AlertCircle, Shield, ChevronDown, ExternalLink,
   ArrowLeft, FolderOpen, ChevronUp
@@ -42,8 +42,8 @@ export default function PartnerDashboard({
   onNavigateOrgChart
 }: PartnerDashboardProps) {
 
-  // Active top tab: default to 'overview' showing both Section 1 and Section 2
-  const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'administrators' | 'branding'>('overview');
+  // Active top tab: 'customers' (default), 'administrators', or 'all' (Show All)
+  const [activeTab, setActiveTab] = useState<'customers' | 'administrators' | 'all'>('customers');
 
   // Customer search & provision state
   const [customerSearch, setCustomerSearch] = useState('');
@@ -52,11 +52,6 @@ export default function PartnerDashboard({
   const [cColor, setCColor] = useState(currentPartner.accentColor || '#10b981');
   const [cLogo, setCLogo] = useState('');
   const [cMsg, setCMsg] = useState<string | null>(null);
-
-  // Brand editor state
-  const [editLogoUrl, setEditLogoUrl] = useState(currentPartner.logoUrl);
-  const [editAccent, setEditAccent] = useState(currentPartner.accentColor);
-  const [brandMsg, setBrandMsg] = useState<string | null>(null);
 
   // New Admin allocation form state
   const [newAdminFirstName, setNewAdminFirstName] = useState('');
@@ -77,10 +72,10 @@ export default function PartnerDashboard({
   const [showAddAdminModal, setShowAddAdminModal] = useState<boolean>(false);
   const [modalAdminTargetCustomer, setModalAdminTargetCustomer] = useState<string | null>(null);
 
-  // Click-to-expand state for Section 1 (customers with multiple assigned administrators)
+  // Click-to-expand state for customers with multiple assigned administrators
   const [expandedCustomerAdmins, setExpandedCustomerAdmins] = useState<Record<string, boolean>>({});
 
-  // Click-to-expand state for Section 2 (administrators with multiple assigned customer accounts)
+  // Click-to-expand state for administrators with multiple assigned customer accounts
   const [expandedAdminAccounts, setExpandedAdminAccounts] = useState<Record<string, boolean>>({});
 
   // Internal fallback customer dashboard navigation state
@@ -325,23 +320,6 @@ export default function PartnerDashboard({
     setTimeout(() => setCMsg(null), 3000);
   };
 
-  // Update branding parameters
-  const handleUpdateBranding = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPartners(prev => prev.map(p => {
-      if (p.id === currentPartner.id) {
-        return {
-          ...p,
-          logoUrl: editLogoUrl,
-          accentColor: editAccent
-        };
-      }
-      return p;
-    }));
-    addAudit('PARTNER_BRAND_UPDATE', `Updated custom reselling brand logo and palette color to ${editAccent}`, 'info');
-    setBrandMsg('Brand assets saved! Look and feel updated immediately.');
-    setTimeout(() => setBrandMsg(null), 3000);
-  };
 
   // Ordered and filtered customers
   let orderedCustomers = [...myCustomers];
@@ -444,7 +422,7 @@ export default function PartnerDashboard({
               Welcome, {currentUser.name}
             </h1>
             <p className="text-xs text-neutral-400">
-              Manage your reseller sub-accounts in Section 1, configure administrator access in Section 2, and click any customer to open their dashboard.
+              Manage your customer sub-accounts, configure administrator access, and click any customer to open their dashboard.
             </p>
           </div>
         </div>
@@ -458,7 +436,7 @@ export default function PartnerDashboard({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4" id="partner_stats">
         <div className="bg-neutral-905 p-4 rounded-xl border border-neutral-800 flex items-center justify-between">
           <div>
-            <span className="text-xs text-neutral-500 font-mono">RESELLER CUSTOMERS (SECTION 1)</span>
+            <span className="text-xs text-neutral-500 font-mono">RESELLER CUSTOMERS</span>
             <div className="text-2xl font-bold text-white mt-1">{myCustomers.length} Customer{myCustomers.length === 1 ? '' : 's'}</div>
             <div className="text-[11px] text-neutral-400 mt-0.5">Under {currentPartner.name}</div>
           </div>
@@ -469,7 +447,7 @@ export default function PartnerDashboard({
 
         <div className="bg-neutral-905 p-4 rounded-xl border border-neutral-800 flex items-center justify-between">
           <div>
-            <span className="text-xs text-neutral-500 font-mono">ADMINISTRATORS (SECTION 2)</span>
+            <span className="text-xs text-neutral-500 font-mono">RESELLER ADMINISTRATORS</span>
             <div className="text-2xl font-bold text-white mt-1">
               {partnerAdmins.length} Administrators
             </div>
@@ -486,7 +464,7 @@ export default function PartnerDashboard({
 
         <div className="bg-neutral-905 p-4 rounded-xl border border-neutral-800 flex items-center justify-between">
           <div>
-            <span className="text-xs font-mono text-purple-400">BRAND & PALETTE</span>
+            <span className="text-xs font-mono text-purple-400">ORGANIZATION DOMAIN</span>
             <div className="text-sm font-semibold text-neutral-300 mt-1 truncate max-w-[180px]">
               {currentPartner.domain || 'Direct Reseller'}
             </div>
@@ -504,19 +482,6 @@ export default function PartnerDashboard({
       {/* TOP TAB BAR */}
       <div className="flex bg-neutral-950 p-1.5 rounded-xl border border-neutral-800 max-w-2xl flex-wrap gap-1" id="partner_tab_bar">
         <button
-          onClick={() => setActiveTab('overview')}
-          className={`flex-1 text-center py-2 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 ${
-            activeTab === 'overview' 
-              ? 'bg-neutral-850 text-white shadow-md border border-neutral-750' 
-              : 'text-neutral-400 hover:text-white hover:bg-neutral-900/50'
-          }`}
-          id="partner_tab_btn_overview"
-        >
-          <FolderOpen className="w-4 h-4 text-emerald-400" />
-          <span>Overview (Sections 1 & 2)</span>
-        </button>
-
-        <button
           onClick={() => setActiveTab('customers')}
           className={`flex-1 text-center py-2 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 ${
             activeTab === 'customers' 
@@ -526,7 +491,7 @@ export default function PartnerDashboard({
           id="partner_tab_btn_customers"
         >
           <Building2 className="w-4 h-4 text-blue-400" />
-          <span>Section 1: Customers</span>
+          <span>Customers</span>
           <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-950 text-blue-300 font-mono border border-blue-800/60 font-bold">
             ({myCustomers.length})
           </span>
@@ -542,23 +507,23 @@ export default function PartnerDashboard({
           id="partner_tab_btn_administrators"
         >
           <Users className="w-4 h-4 text-emerald-450" />
-          <span>Section 2: Administrators</span>
+          <span>Administrators</span>
           <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-950 text-emerald-300 font-mono border border-emerald-800/60 font-bold">
             ({partnerAdmins.length})
           </span>
         </button>
 
         <button
-          onClick={() => setActiveTab('branding')}
-          className={`py-2 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 ${
-            activeTab === 'branding' 
+          onClick={() => setActiveTab('all')}
+          className={`flex-1 text-center py-2 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            activeTab === 'all' 
               ? 'bg-neutral-850 text-white shadow-md border border-neutral-750' 
               : 'text-neutral-400 hover:text-white hover:bg-neutral-900/50'
           }`}
-          id="partner_tab_btn_branding"
+          id="partner_tab_btn_all"
         >
-          <Sliders className="w-4 h-4 text-purple-400" />
-          <span>Branding</span>
+          <FolderOpen className="w-4 h-4 text-neutral-300" />
+          <span>Show All</span>
         </button>
       </div>
 
@@ -577,24 +542,19 @@ export default function PartnerDashboard({
       )}
 
       {/* ========================================================================= */}
-      {/* SECTION 1: RESELLER CUSTOMERS (VERTICAL LIST)                              */}
+      {/* RESELLER CUSTOMERS (VERTICAL LIST)                                        */}
       {/* ========================================================================= */}
-      {(activeTab === 'overview' || activeTab === 'customers') && (
-        <section className="bg-[#08090d] border border-blue-500/30 rounded-2xl p-6 space-y-5 shadow-2xl" id="section_1_reseller_customers">
+      {(activeTab === 'customers' || activeTab === 'all') && (
+        <section className="bg-[#08090d] border border-blue-500/30 rounded-2xl p-6 space-y-5 shadow-2xl" id="reseller_customers_view">
           
-          {/* Section 1 Header Banner (HIGH CONTRAST GRADIENT DECK) */}
+          {/* Reseller Customers Header Banner (HIGH CONTRAST GRADIENT DECK) */}
           <div className="bg-gradient-to-r from-blue-950/70 via-[#0f172a]/90 to-[#090d16] border-2 border-blue-500/50 rounded-xl p-5 shadow-lg space-y-4" id="reseller_customers_control_section">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2.5">
-                  <span className="text-[11px] uppercase font-mono font-extrabold tracking-widest px-2.5 py-1 rounded bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-xs">
-                    SECTION 1
-                  </span>
-                  <h3 className="text-base font-bold text-white tracking-wide flex items-center gap-2">
-                    <Building2 className="w-5 h-5 text-blue-400" />
-                    <span>Reseller Sub-Accounts (Customers)</span>
-                  </h3>
-                </div>
+                <h3 className="text-base font-bold text-white tracking-wide flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-blue-400" />
+                  <span>Reseller Customers</span>
+                </h3>
                 <p className="text-xs text-neutral-300/90 mt-1.5 max-w-2xl leading-relaxed">
                   Active client workspaces under <strong className="text-white font-semibold">{currentPartner.name}</strong>. Each customer row features direct administrator assignment and a hotlink to open that Customer's dedicated dashboard.
                 </p>
@@ -959,24 +919,19 @@ export default function PartnerDashboard({
       )}
 
       {/* ========================================================================= */}
-      {/* SECTION 2: RESELLER ADMINISTRATORS (VERTICAL LIST)                        */}
+      {/* RESELLER ADMINISTRATORS (VERTICAL LIST)                                   */}
       {/* ========================================================================= */}
-      {(activeTab === 'overview' || activeTab === 'administrators') && (
-        <section className="bg-[#08090d] border border-emerald-500/30 rounded-2xl p-6 space-y-5 shadow-2xl" id="section_2_administrators">
+      {(activeTab === 'administrators' || activeTab === 'all') && (
+        <section className="bg-[#08090d] border border-emerald-500/30 rounded-2xl p-6 space-y-5 shadow-2xl" id="reseller_administrators_view">
           
-          {/* Section 2 Header Banner (HIGH CONTRAST GRADIENT DECK) */}
+          {/* Reseller Administrators Header Banner (HIGH CONTRAST GRADIENT DECK) */}
           <div className="bg-gradient-to-r from-emerald-950/70 via-[#0d1a15]/90 to-[#090d16] border-2 border-emerald-500/50 rounded-xl p-5 shadow-lg space-y-4" id="reseller_admins_control_section">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2.5">
-                  <span className="text-[11px] uppercase font-mono font-extrabold tracking-widest px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs">
-                    SECTION 2
-                  </span>
-                  <h3 className="text-base font-bold text-white tracking-wide flex items-center gap-2">
-                    <Users className="w-5 h-5 text-emerald-450" />
-                    <span>Reseller Administrators</span>
-                  </h3>
-                </div>
+                <h3 className="text-base font-bold text-white tracking-wide flex items-center gap-2">
+                  <Users className="w-5 h-5 text-emerald-450" />
+                  <span>Reseller Administrators</span>
+                </h3>
                 <p className="text-xs text-neutral-300/90 mt-1.5 max-w-2xl leading-relaxed">
                   Delegated administrative team for <strong className="text-white font-semibold">{currentPartner.name}</strong>. Single accounts are listed directly; multiple accounts expand to show every hotlinked customer dashboard.
                 </p>
@@ -1351,92 +1306,7 @@ export default function PartnerDashboard({
         </section>
       )}
 
-      {/* ========================================================================= */}
-      {/* BRANDING PARAMETERS TAB                                                   */}
-      {/* ========================================================================= */}
-      {activeTab === 'branding' && (
-        <section className="bg-neutral-950 border border-neutral-800 rounded-xl p-6 max-w-2xl" id="partner_tab_brand_settings">
-          <div className="mb-6">
-            <h3 className="text-base font-semibold text-white flex items-center gap-2">
-              <Sliders className="w-4 h-4 text-purple-400" />
-              White-Label Branding Parameters
-            </h3>
-            <p className="text-xs text-neutral-400 mt-1">
-              Modify the logos, headings, icons, and theme configuration used by customer portals underneath {currentPartner.name}.
-            </p>
-          </div>
 
-          {brandMsg && (
-            <div className="mb-5 p-3 rounded-lg bg-emerald-950/40 border border-emerald-900 text-emerald-400 text-xs flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{brandMsg}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleUpdateBranding} className="space-y-5 text-sm">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="block text-xs uppercase text-neutral-400 font-bold tracking-wider">
-                  Logo URL (Preview Linked)
-                </label>
-                <input
-                  type="url"
-                  required
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2.5 text-xs text-neutral-200 focus:outline-none focus:border-emerald-500"
-                  value={editLogoUrl}
-                  onChange={(e) => setEditLogoUrl(e.target.value)}
-                />
-                <span className="text-[10px] text-neutral-500 block">
-                  Provide a public image URL or SVG to brand your reseller portal.
-                </span>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-xs uppercase text-neutral-400 font-bold tracking-wider">
-                  Brand Palette Accent
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="color"
-                    className="w-10 h-10 bg-neutral-950 border border-neutral-800 rounded cursor-pointer"
-                    value={editAccent}
-                    onChange={(e) => setEditAccent(e.target.value)}
-                  />
-                  <input
-                    type="text"
-                    className="flex-1 bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs font-mono text-neutral-200 focus:outline-none focus:border-emerald-500"
-                    value={editAccent}
-                    onChange={(e) => setEditAccent(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Logo Preview box */}
-            <div className="bg-neutral-900/40 p-4 rounded-lg border border-neutral-850 flex items-center gap-4">
-              <img 
-                src={editLogoUrl} 
-                alt="Logo preview" 
-                className="w-12 h-12 rounded-lg object-cover bg-neutral-950 border border-neutral-800" 
-                referrerPolicy="no-referrer" 
-              />
-              <div>
-                <span className="text-xs block text-neutral-300 font-semibold mb-0.5">Asset Render Preview</span>
-                <p className="text-[10px] text-neutral-400 leading-relaxed">
-                  Your customized white-label assets render at the header rail and customer portals automatically.
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-colors cursor-pointer shadow-sm"
-            >
-              Commit Dynamic Theme Parameters
-            </button>
-          </form>
-        </section>
-      )}
 
       {/* Add Customer Modal */}
       {showAddCustomerModal && (
