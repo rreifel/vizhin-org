@@ -61,12 +61,8 @@ export default function PartnerDashboard({
   const [newAdminInitialAccess, setNewAdminInitialAccess] = useState<string[]>([]);
   const [adminMsg, setAdminMsg] = useState<string | null>(null);
 
-  // Independent Display pull downs (options: 1, 3, 5, 10)
-  const [displayCustomersCount, setDisplayCustomersCount] = useState<number>(3);
-  const [displayAdminsCount, setDisplayAdminsCount] = useState<number>(3);
-
-  // Customer pull down selection (which customer is focused/featured, or 'all')
-  const [selectedCustomerPulldownId, setSelectedCustomerPulldownId] = useState<string>('all');
+  // Selected customer ID (null = show searchable customer list)
+  const [selectedCustomerPulldownId, setSelectedCustomerPulldownId] = useState<string | null>(null);
 
   // Quick Add Admin modal from Assigned Administrator section
   const [showAddAdminModal, setShowAddAdminModal] = useState<boolean>(false);
@@ -321,29 +317,18 @@ export default function PartnerDashboard({
   };
 
 
-  // Ordered and filtered customers
-  let orderedCustomers = [...myCustomers];
-  if (selectedCustomerPulldownId !== 'all') {
-    const chosenCust = orderedCustomers.find(c => c.id === selectedCustomerPulldownId);
-    if (chosenCust) {
-      orderedCustomers = [chosenCust, ...orderedCustomers.filter(c => c.id !== selectedCustomerPulldownId)];
-    }
-  }
-
-  const filteredCustomers = orderedCustomers.filter(c => 
+  // Filtered customers matching search
+  const filteredCustomers = myCustomers.filter(c => 
     !customerSearch.trim() ||
-    c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-    c.id.toLowerCase().includes(customerSearch.toLowerCase())
+    c.name.toLowerCase().includes(customerSearch.toLowerCase().trim()) ||
+    c.id.toLowerCase().includes(customerSearch.toLowerCase().trim())
   );
 
-  // CRITICAL RULE: IF All Reseller Customers are selected, override the Display setting and display all.
-  const isAllCustomersSelected = selectedCustomerPulldownId === 'all';
-  const displayedCustomers = isAllCustomersSelected
-    ? filteredCustomers
-    : filteredCustomers.slice(0, displayCustomersCount);
+  // Selected customer (null if viewing customer list)
+  const selectedCustomer = myCustomers.find(c => c.id === selectedCustomerPulldownId) || null;
 
-  // Administrators sliced by displayAdminsCount
-  const displayedAdmins = partnerAdmins.slice(0, displayAdminsCount);
+  // Administrators (all displayed cleanly without slice)
+  const displayedAdmins = partnerAdmins;
 
   // Render standalone customer dashboard if hotlinked without external router
   if (viewingCustomer) {
@@ -481,21 +466,44 @@ export default function PartnerDashboard({
 
       {/* TOP TAB BAR */}
       <div className="flex bg-neutral-950 p-1.5 rounded-xl border border-neutral-800 max-w-2xl flex-wrap gap-1" id="partner_tab_bar">
-        <button
-          onClick={() => setActiveTab('customers')}
-          className={`flex-1 text-center py-2 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 ${
-            activeTab === 'customers' 
-              ? 'bg-neutral-850 text-white shadow-md border border-neutral-750' 
-              : 'text-neutral-400 hover:text-white hover:bg-neutral-900/50'
-          }`}
-          id="partner_tab_btn_customers"
-        >
-          <Building2 className="w-4 h-4 text-blue-400" />
-          <span>Customers</span>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-950 text-blue-300 font-mono border border-blue-800/60 font-bold">
-            ({myCustomers.length})
-          </span>
-        </button>
+        {/* CUSTOMERS PULLDOWN TAB */}
+        <div className="relative flex-1 min-w-[210px]" id="partner_tab_customers_container">
+          <select
+            value={activeTab === 'customers' ? (selectedCustomerPulldownId || 'all') : 'all'}
+            onChange={(e) => {
+              const val = e.target.value;
+              setActiveTab('customers');
+              if (val === 'all') {
+                setSelectedCustomerPulldownId(null);
+              } else {
+                setSelectedCustomerPulldownId(val);
+              }
+            }}
+            onClick={() => {
+              if (activeTab !== 'customers') {
+                setActiveTab('customers');
+              }
+            }}
+            className={`w-full py-2 pl-9 pr-8 text-xs font-semibold rounded-lg transition-all cursor-pointer appearance-none border ${
+              activeTab === 'customers' 
+                ? 'bg-neutral-850 text-white shadow-md border-neutral-750' 
+                : 'bg-transparent text-neutral-400 hover:text-white hover:bg-neutral-900/50 border-transparent'
+            }`}
+            id="partner_tab_btn_customers"
+            title="Customers list or select specific customer"
+          >
+            <option value="all" className="bg-neutral-900 text-white font-bold">
+              Customers ({myCustomers.length})
+            </option>
+            {myCustomers.map(c => (
+              <option key={c.id} value={c.id} className="bg-neutral-900 text-white font-medium">
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <Building2 className="w-4 h-4 text-blue-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <ChevronDown className="w-3.5 h-3.5 text-neutral-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        </div>
 
         <button
           onClick={() => setActiveTab('administrators')}
@@ -560,44 +568,8 @@ export default function PartnerDashboard({
                 </p>
               </div>
 
-              {/* CONTROLS DOCK: High-contrast elevated dark tray */}
-              <div className="flex items-center gap-2.5 bg-black/80 border border-neutral-750 p-2 rounded-xl shadow-inner flex-wrap shrink-0">
-                {/* Display pull down: 1, 3, 5, 10 */}
-                <div className="flex items-center gap-1.5 bg-neutral-900 border border-neutral-700 rounded-lg px-2.5 py-1.5 shadow-sm">
-                  <span className="text-[11px] text-neutral-400 font-mono font-semibold">Display:</span>
-                  <select
-                    value={displayCustomersCount}
-                    onChange={(e) => setDisplayCustomersCount(Number(e.target.value))}
-                    className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer"
-                    id="pulldown_display_customers"
-                    title="Number of reseller customers to display in vertical list"
-                  >
-                    <option value={1} className="bg-neutral-900 text-white">1</option>
-                    <option value={3} className="bg-neutral-900 text-white">3</option>
-                    <option value={5} className="bg-neutral-900 text-white">5</option>
-                    <option value={10} className="bg-neutral-900 text-white">10</option>
-                  </select>
-                </div>
-
-                {/* Customer Pulldown */}
-                <div className="relative min-w-[230px]">
-                  <select
-                    value={selectedCustomerPulldownId}
-                    onChange={(e) => setSelectedCustomerPulldownId(e.target.value)}
-                    className="w-full bg-neutral-900 border-2 border-blue-500/70 hover:border-blue-400 text-white rounded-lg px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/40 cursor-pointer shadow-md appearance-none pr-8"
-                    id="pulldown_select_customer"
-                  >
-                    <option value="all">-- All Reseller Customers ({myCustomers.length}) --</option>
-                    {myCustomers.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-neutral-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-
-                {/* Add Customer Button */}
+              {/* CONTROLS DOCK: Add Customer Button */}
+              <div className="flex items-center gap-2.5 bg-black/80 border border-neutral-750 p-2 rounded-xl shadow-inner shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowAddCustomerModal(true)}
@@ -609,41 +581,147 @@ export default function PartnerDashboard({
                 </button>
               </div>
             </div>
-
-            {/* Subtext info bar with OVERRIDE indicator */}
-            <div className="pt-2.5 border-t border-blue-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-[11px] font-mono">
-              <div className="flex items-center gap-2 flex-wrap">
-                {isAllCustomersSelected ? (
-                  <span className="px-2.5 py-1 rounded bg-blue-950 text-blue-200 border border-blue-700/80 flex items-center gap-1.5 font-bold shadow-xs">
-                    <Check className="w-3.5 h-3.5 text-blue-400" />
-                    "All Reseller Customers" Selected: Overriding Display ({displayCustomersCount}) → Displaying all {displayedCustomers.length}
-                  </span>
-                ) : (
-                  <span className="text-neutral-300 bg-neutral-950/80 px-2.5 py-1 rounded border border-neutral-800">
-                    Showing <strong className="text-white font-bold">{displayedCustomers.length}</strong> of {myCustomers.length} customer{myCustomers.length === 1 ? '' : 's'} (Display limit: {displayCustomersCount})
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Search className="w-3.5 h-3.5 text-neutral-400" />
-                <input
-                  type="text"
-                  placeholder="Filter by customer name or ID..."
-                  value={customerSearch}
-                  onChange={(e) => setCustomerSearch(e.target.value)}
-                  className="bg-neutral-950 border border-neutral-750 rounded-lg px-3 py-1 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-blue-400 w-44 transition-colors"
-                />
-              </div>
-            </div>
           </div>
 
-          {/* VERTICAL LIST OF CUSTOMER CARDS (FRAMED CARDS WITH 5px ACCENT STRIPE) */}
-          <div className="flex flex-col space-y-4" id="reseller_customers_vertical_list">
-            {displayedCustomers.map((customer, idx) => {
-              const assignedAdmins = partnerAdmins.filter(adm => adminHasCustomerAccess(adm, customer.id));
-              const isExpanded = !!expandedCustomerAdmins[customer.id];
-              const accentColor = customer.accentColor || '#3b82f6';
+          {/* SEARCH BAR (Prominent search above customer list) */}
+          <div className="bg-neutral-950/80 p-3 rounded-xl border border-neutral-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search customers by name or ID (matches any part of name)..."
+                value={customerSearch}
+                onChange={(e) => setCustomerSearch(e.target.value)}
+                className="w-full bg-neutral-900 border border-neutral-750 rounded-lg pl-9 pr-9 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500 transition-colors"
+                id="search_customers_input"
+              />
+              {customerSearch && (
+                <button
+                  type="button"
+                  onClick={() => setCustomerSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white p-0.5 cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <span className="text-[11px] font-mono text-neutral-400 shrink-0">
+              Showing {filteredCustomers.length} of {myCustomers.length} Customers
+            </span>
+          </div>
+
+          {/* CONDITIONAL: IF NO CUSTOMER SELECTED, SHOW SEARCHABLE LIST; IF SELECTED, SHOW FULL DETAIL CARD */}
+          {!selectedCustomer ? (
+            <div className="space-y-3" id="reseller_customers_selection_list">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs text-neutral-400 font-medium">
+                  Select a customer below or choose from the top pulldown to view their details:
+                </span>
+              </div>
+
+              {filteredCustomers.length === 0 ? (
+                <div className="p-12 text-center bg-neutral-950 border border-dashed border-neutral-800 rounded-xl">
+                  <Building2 className="w-8 h-8 text-neutral-600 mx-auto mb-2" />
+                  <h4 className="text-sm font-semibold text-neutral-400">No Matching Customers Found</h4>
+                  <p className="text-xs text-neutral-500 mt-1">
+                    {customerSearch ? `No customers matched "${customerSearch}".` : 'No customers are registered under this reseller yet.'}
+                  </p>
+                  {customerSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomerSearch('')}
+                      className="mt-3 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 rounded-lg text-xs font-semibold border border-neutral-800 cursor-pointer"
+                    >
+                      Clear Search Filter
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-2.5">
+                  {filteredCustomers.map((customer) => {
+                    const custAdmins = partnerAdmins.filter(a => adminHasCustomerAccess(a, customer.id));
+                    const accentColor = customer.accentColor || '#3b82f6';
+                    return (
+                      <div
+                        key={customer.id}
+                        onClick={() => setSelectedCustomerPulldownId(customer.id)}
+                        className="group p-3.5 rounded-xl bg-neutral-905 border border-neutral-800 hover:border-blue-500/60 hover:bg-neutral-850 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm"
+                        style={{ borderLeft: `4px solid ${accentColor}` }}
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <img
+                            src={customer.logoUrl}
+                            alt={customer.name}
+                            className="w-10 h-10 rounded-lg object-cover bg-neutral-950 border border-neutral-800 shrink-0"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                          />
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors flex items-center gap-2 truncate">
+                              {customer.name}
+                            </h4>
+                            <div className="flex items-center gap-2 text-[11px] text-neutral-400 font-mono mt-0.5">
+                              <span>ID: {customer.id}</span>
+                              <span>•</span>
+                              <span className="text-neutral-300">
+                                {custAdmins.length} Administrator{custAdmins.length === 1 ? '' : 's'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenCustomerDashboard(customer);
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-neutral-700"
+                            title="Open dedicated customer dashboard"
+                          >
+                            <span>Open Dashboard</span>
+                            <ExternalLink className="w-3.5 h-3.5 text-blue-400" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCustomerPulldownId(customer.id)}
+                            className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
+                          >
+                            <span>Select Customer</span>
+                            <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4" id="reseller_selected_customer_view">
+              <div className="flex items-center justify-between pb-2 border-b border-neutral-800">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCustomerPulldownId(null)}
+                  className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1.5 cursor-pointer bg-neutral-900 hover:bg-neutral-850 px-3 py-1.5 rounded-lg border border-neutral-800 transition-colors"
+                  id="btn_back_to_customer_list"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>← Back to Customer List ({myCustomers.length})</span>
+                </button>
+                <span className="text-xs text-neutral-400 font-mono">
+                  Viewing Selected: <strong className="text-white">{selectedCustomer.name}</strong>
+                </span>
+              </div>
+
+              {/* SELECTED CUSTOMER FULL DETAIL CARD */}
+              {[selectedCustomer].map((customer) => {
+                const assignedAdmins = partnerAdmins.filter(adm => adminHasCustomerAccess(adm, customer.id));
+                const isExpanded = !!expandedCustomerAdmins[customer.id];
+                const accentColor = customer.accentColor || '#3b82f6';
+                const customerIndex = myCustomers.findIndex(c => c.id === customer.id);
 
               let currentPullDownValue = 'none';
               if (assignedAdmins.length === partnerAdmins.length && partnerAdmins.length > 1) {
@@ -665,7 +743,7 @@ export default function PartnerDashboard({
                   <div className="px-4 py-2 bg-neutral-900/70 border-b border-neutral-850 flex items-center justify-between text-[11px] font-mono">
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full inline-block shadow-xs" style={{ backgroundColor: accentColor }} />
-                      <span className="font-bold text-white tracking-wider">CUSTOMER #{idx + 1}</span>
+                      <span className="font-bold text-white tracking-wider">CUSTOMER #{customerIndex >= 0 ? customerIndex + 1 : 1}</span>
                       <span className="text-neutral-600">•</span>
                       <span className="text-neutral-400">ID: {customer.id}</span>
                     </div>
@@ -903,19 +981,9 @@ export default function PartnerDashboard({
                 </div>
               );
             })}
-
-            {displayedCustomers.length === 0 && (
-              <div className="p-12 text-center bg-neutral-950 border border-dashed border-neutral-800 rounded-xl">
-                <Building2 className="w-8 h-8 text-neutral-600 mx-auto mb-2" />
-                <h4 className="text-sm font-semibold text-neutral-400">No Customers Found</h4>
-                <p className="text-xs text-neutral-500 mt-1">
-                  {customerSearch ? `No customers matched "${customerSearch}".` : 'No customers are registered under this reseller yet.'}
-                </p>
-              </div>
-            )}
           </div>
-
-        </section>
+        )}
+      </section>
       )}
 
       {/* ========================================================================= */}
@@ -937,26 +1005,8 @@ export default function PartnerDashboard({
                 </p>
               </div>
 
-              {/* CONTROLS DOCK: High-contrast elevated dark tray */}
-              <div className="flex items-center gap-2.5 bg-black/80 border border-neutral-750 p-2 rounded-xl shadow-inner flex-wrap shrink-0">
-                {/* Display pull down: 1, 3, 5, 10 */}
-                <div className="flex items-center gap-1.5 bg-neutral-900 border border-neutral-700 rounded-lg px-2.5 py-1.5 shadow-sm">
-                  <span className="text-[11px] text-neutral-400 font-mono font-semibold">Display:</span>
-                  <select
-                    value={displayAdminsCount}
-                    onChange={(e) => setDisplayAdminsCount(Number(e.target.value))}
-                    className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer"
-                    id="pulldown_display_admins"
-                    title="Number of administrators to display in vertical list"
-                  >
-                    <option value={1} className="bg-neutral-900 text-white">1</option>
-                    <option value={3} className="bg-neutral-900 text-white">3</option>
-                    <option value={5} className="bg-neutral-900 text-white">5</option>
-                    <option value={10} className="bg-neutral-900 text-white">10</option>
-                  </select>
-                </div>
-
-                {/* Add Admin Button */}
+              {/* CONTROLS DOCK: Add Admin Button */}
+              <div className="flex items-center gap-2.5 bg-black/80 border border-neutral-750 p-2 rounded-xl shadow-inner shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -975,7 +1025,7 @@ export default function PartnerDashboard({
             {/* Subtext info bar */}
             <div className="pt-2.5 border-t border-emerald-900/40 flex items-center justify-between text-[11px] font-mono text-neutral-400">
               <span className="bg-neutral-950/80 px-2.5 py-1 rounded border border-neutral-800 text-neutral-300">
-                Showing <strong className="text-white font-bold">{displayedAdmins.length}</strong> of {partnerAdmins.length} administrator{partnerAdmins.length === 1 ? '' : 's'} (Display limit: {displayAdminsCount})
+                Showing <strong className="text-white font-bold">{displayedAdmins.length}</strong> administrator{displayedAdmins.length === 1 ? '' : 's'}
               </span>
               <span className="text-emerald-450 font-semibold hidden sm:inline">
                 Vertical List • Hotlinks to Customer Dashboards
