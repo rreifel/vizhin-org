@@ -72,12 +72,10 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
   onBack,
 }) => {
   // Step 1: Organization Details & Decoupled Logo
-  const [companyName, setCompanyName] = useState('Nexus Horizons Enterprise');
-  const [domain, setDomain] = useState('nexushorizons.com');
+  const [companyName, setCompanyName] = useState('');
+  const [domain, setDomain] = useState('');
   const [selectedPartnerId, setSelectedPartnerId] = useState<string>(''); // blank = direct Vizhin
-  const [logoPreview, setLogoPreview] = useState<string>(
-    'https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=160&h=160&fit=crop'
-  );
+  const [logoPreview, setLogoPreview] = useState<string>('');
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   // Onboarding Method Dropdown: Option 1 (CSV), Option 2 (HRIS Manual), Option 3 (HRIS Integration)
@@ -85,15 +83,15 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
   const [selectedHris, setSelectedHris] = useState<string>('ADP Workforce Now');
 
   // Customer Admin Setup (Fields directly above CSV upload zone)
-  const [adminFirstName, setAdminFirstName] = useState('Jordan');
-  const [adminLastName, setAdminLastName] = useState('Keller');
-  const [adminEmail, setAdminEmail] = useState('jordan.keller@nexushorizons.com');
+  const [adminFirstName, setAdminFirstName] = useState('');
+  const [adminLastName, setAdminLastName] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
 
   // CSV State
-  const [csvFileName, setCsvFileName] = useState<string>('sample_company_hierarchy.csv');
+  const [csvFileName, setCsvFileName] = useState<string>('');
   const [csvData, setCsvData] = useState<CsvEmployeeRecord[]>([]);
   const [csvError, setCsvError] = useState<string | null>(null);
-  const [isCsvUploaded, setIsCsvUploaded] = useState<boolean>(true);
+  const [isCsvUploaded, setIsCsvUploaded] = useState<boolean>(false);
   const csvFileInputRef = useRef<HTMLInputElement>(null);
 
   // Info Modal state
@@ -525,20 +523,13 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
 
       {/* Main Header Card */}
       <div className="bg-gradient-to-r from-neutral-900 via-neutral-900 to-emerald-950/30 border border-neutral-800 rounded-2xl p-6 sm:p-8 shadow-xl">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
-              <span>Customer Portal Onboarding</span>
-            </h1>
-            <p className="text-xs text-neutral-400 mt-1 max-w-2xl leading-relaxed">
-              Configure isolated tenant workspace, assign partner governance, establish root customer administrative authority, and import hierarchy data.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs font-mono text-neutral-400 bg-neutral-950 px-3 py-1.5 rounded-lg border border-neutral-800">
-              Target Tenant: <strong className="text-white">{companyName || 'Draft Organization'}</strong>
-            </span>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
+            <span>Customer Portal Onboarding</span>
+          </h1>
+          <p className="text-xs text-neutral-400 mt-1 max-w-2xl leading-relaxed">
+            Configure isolated tenant workspace, assign partner governance, establish root customer administrative authority, and import hierarchy data.
+          </p>
         </div>
       </div>
 
