@@ -29,16 +29,40 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     createdAt: '2026-03-01T09:00:00Z',
   },
   {
-    id: 'cust_zenith',
+    id: 'cust_apex_freight',
     partnerId: 'partner_acuity',
+    name: 'Apex Freight Solutions',
+    logoUrl: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=120&h=120&q=80',
+    accentColor: '#0ea5e9', // Sky Blue
+    createdAt: '2026-03-05T11:00:00Z',
+  },
+  {
+    id: 'cust_apex_intl',
+    partnerId: 'partner_acuity',
+    name: 'Apex International Cargo',
+    logoUrl: 'https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&w=120&h=120&q=80',
+    accentColor: '#6366f1', // Indigo
+    createdAt: '2026-03-10T14:30:00Z',
+  },
+  {
+    id: 'cust_zenith',
+    partnerId: null, // Direct Customer managed by Super Admin
     name: 'Zenith Digital Systems',
     logoUrl: 'https://images.unsplash.com/photo-1542744094-3a31f103e35f?auto=format&fit=crop&w=120&h=120&q=80',
     accentColor: '#ec4899', // Pink
     createdAt: '2026-03-12T14:15:00Z',
   },
   {
+    id: 'cust_acuity',
+    partnerId: null, // Appears under Total Customers in Super Admin Dashboard
+    name: 'Acuity Enterprises',
+    logoUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=120&h=120&q=80',
+    accentColor: '#8b5cf6', // Purple
+    createdAt: '2026-01-10T08:00:00Z',
+  },
+  {
     id: 'cust_vortex',
-    partnerId: 'partner_nexus',
+    partnerId: null, // Direct Customer (for now, only Apex is associated with a reseller, Acuity)
     name: 'Vortex Biotech Corp',
     logoUrl: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=120&h=120&q=80',
     accentColor: '#06b6d4', // Cyan
@@ -70,10 +94,11 @@ export const INITIAL_USERS: PortalUser[] = [
   {
     id: 'user_acuity_admin_1',
     email: 'admin@acuity.com',
-    name: 'Sarah Jenkins (Acuity Partner Admin)',
-    role: 'PARTNER_ADMIN',
+    name: 'Sarah Jenkins',
+    role: 'PARTNER_ADMIN_GLOBAL',
     partnerId: 'partner_acuity',
     customerId: null,
+    assignedCustomerIds: ['cust_apex'],
     avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=facearea&facepad=2&w=120&h=120&q=80',
     isActive: true,
     createdAt: '2026-01-11T10:00:00Z',
@@ -82,13 +107,27 @@ export const INITIAL_USERS: PortalUser[] = [
   {
     id: 'user_acuity_admin_2',
     email: 'partner_sub_admin@acuity.com',
-    name: 'James Carter (Acuity Co-Admin)',
+    name: 'James Carter',
     role: 'PARTNER_ADMIN',
     partnerId: 'partner_acuity',
     customerId: null,
+    assignedCustomerIds: ['cust_apex', 'cust_apex_freight'],
     avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=facearea&facepad=2&w=120&h=120&q=80',
     isActive: true,
     createdAt: '2026-02-01T15:20:00Z',
+    mfaEnabled: false,
+  },
+  {
+    id: 'user_acuity_admin_3',
+    email: 'emily.davis@acuity.com',
+    name: 'Emily Davis',
+    role: 'PARTNER_ADMIN',
+    partnerId: 'partner_acuity',
+    customerId: null,
+    assignedCustomerIds: ['cust_apex'],
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=facearea&facepad=2&w=120&h=120&q=80',
+    isActive: true,
+    createdAt: '2026-02-10T11:00:00Z',
     mfaEnabled: false,
   },
   {
@@ -98,6 +137,7 @@ export const INITIAL_USERS: PortalUser[] = [
     role: 'PARTNER_ADMIN',
     partnerId: 'partner_nexus',
     customerId: null,
+    assignedCustomerIds: ['cust_vortex'],
     avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=facearea&facepad=2&w=120&h=120&q=80',
     isActive: true,
     createdAt: '2026-02-16T14:00:00Z',

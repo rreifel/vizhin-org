@@ -24,7 +24,8 @@ const DEMO_TEST_USERS = [
   { email: 'sarah.connor@strataorg.com', name: 'Sarah Connor (CEO)', role: 'SUPER_ADMIN' },
   { email: 'tony.stark@strataorg.com', name: 'Tony Stark (CTO)', role: 'SUPER_ADMIN' },
   { email: 'ellen.ripley@strataorg.com', name: 'Ellen Ripley (COO)', role: 'SUPER_ADMIN' },
-  { email: 'admin@acuity.com', name: 'Sarah Jenkins', role: 'PARTNER_ADMIN' },
+  { email: 'admin@acuity.com', name: 'Sarah Jenkins', role: 'PARTNER_ADMIN_GLOBAL' },
+  { email: 'partner_sub_admin@acuity.com', name: 'James Carter', role: 'PARTNER_ADMIN' },
   { email: 'admin@apex.com', name: 'David Miller', role: 'CUSTOMER_ADMIN' },
 ];
 
@@ -74,7 +75,25 @@ export default function App() {
 
   const [customers, setCustomers] = useState<Customer[]>(() => {
     const saved = localStorage.getItem('vzn_customers');
-    return saved ? JSON.parse(saved) : INITIAL_CUSTOMERS;
+    if (!saved) return INITIAL_CUSTOMERS;
+    try {
+      const parsed: Customer[] = JSON.parse(saved);
+      // Ensure initial customers exist
+      const existingIds = new Set(parsed.map((c: Customer) => c.id));
+      const merged = [...parsed];
+      INITIAL_CUSTOMERS.forEach(ic => {
+        if (!existingIds.has(ic.id)) merged.push(ic);
+      });
+      // Apex entities are associated with Acuity, others are direct
+      return merged.map((c: Customer) => {
+        if (c.id === 'cust_apex' || c.id === 'cust_apex_freight' || c.id === 'cust_apex_intl') {
+          return { ...c, partnerId: 'partner_acuity' };
+        }
+        return { ...c, partnerId: null };
+      });
+    } catch {
+      return INITIAL_CUSTOMERS;
+    }
   });
 
   const [users, setUsers] = useState<PortalUser[]>(() => {
@@ -83,9 +102,24 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          return parsed.map((u: PortalUser) => {
+          const existingUserIds = new Set(parsed.map((u: PortalUser) => u.id));
+          const merged = [...parsed];
+          INITIAL_USERS.forEach(iu => {
+            if (!existingUserIds.has(iu.id)) merged.push(iu);
+          });
+          return merged.map((u: PortalUser) => {
             if (u.email === 'super@vizhin.co') {
-              return { ...u, email: 'rreifel@vizhin.co' };
+              u = { ...u, email: 'rreifel@vizhin.co' };
+            }
+            // Ensure Sarah Jenkins is PARTNER_ADMIN_GLOBAL
+            if (u.id === 'user_acuity_admin_1' || u.email === 'admin@acuity.com') {
+              u = { ...u, role: 'PARTNER_ADMIN_GLOBAL', name: 'Sarah Jenkins', partnerId: 'partner_acuity', assignedCustomerIds: ['cust_apex', 'cust_apex_freight', 'cust_apex_intl'] };
+            }
+            if (u.id === 'user_acuity_admin_2' || u.email === 'partner_sub_admin@acuity.com') {
+              u = { ...u, role: 'PARTNER_ADMIN', name: 'James Carter', partnerId: 'partner_acuity', assignedCustomerIds: ['cust_apex', 'cust_apex_freight'] };
+            }
+            if (u.id === 'user_acuity_admin_3' || u.email === 'emily.davis@acuity.com') {
+              u = { ...u, role: 'PARTNER_ADMIN', name: 'Emily Davis', partnerId: 'partner_acuity', assignedCustomerIds: ['cust_apex'] };
             }
             return u;
           });
@@ -310,7 +344,7 @@ export default function App() {
   let currentPartnerObj: Partner | null = null;
   let currentCustomerObj: Customer | null = null;
 
-  if (currentUser.role === 'PARTNER_ADMIN' && currentUser.partnerId) {
+  if ((currentUser.role === 'PARTNER_ADMIN' || currentUser.role === 'PARTNER_ADMIN_GLOBAL') && currentUser.partnerId) {
     currentPartnerObj = partners.find(p => p.id === currentUser.partnerId) || null;
   } else if (currentUser.role === 'CUSTOMER_ADMIN' && currentUser.customerId) {
     currentCustomerObj = customers.find(c => c.id === currentUser.customerId) || null;
@@ -460,17 +494,22 @@ export default function App() {
                         key={acc.email}
                         type="button"
                         onClick={() => {
-                          handleLoginSuccess({
-                            id: `usr_${acc.email.replace(/[@.]/g, '_')}`,
-                            email: acc.email,
-                            name: acc.name,
-                            role: acc.role as any,
-                            partnerId: null,
-                            customerId: null,
-                            isActive: true,
-                            createdAt: new Date().toISOString(),
-                            mfaEnabled: false
-                          });
+                          const existing = users.find(u => u.email.toLowerCase() === acc.email.toLowerCase());
+                          if (existing) {
+                            handleLoginSuccess(existing);
+                          } else {
+                            handleLoginSuccess({
+                              id: `usr_${acc.email.replace(/[@.]/g, '_')}`,
+                              email: acc.email,
+                              name: acc.name,
+                              role: acc.role as any,
+                              partnerId: acc.email.includes('acuity') ? 'partner_acuity' : (acc.email.includes('apex') ? 'partner_acuity' : null),
+                              customerId: acc.email.includes('apex') ? 'cust_apex' : null,
+                              isActive: true,
+                              createdAt: new Date().toISOString(),
+                              mfaEnabled: false
+                            });
+                          }
                           setUserMenuOpen(false);
                         }}
                         className={`w-full text-left p-2 rounded-lg text-xs transition-colors flex items-center justify-between cursor-pointer ${
@@ -595,8 +634,13 @@ export default function App() {
                   openRequests={openRequests}
                   setOpenRequests={setOpenRequests}
                   onNavigateSetup={() => navigateTo('setup')}
+                  leads={leads}
+                  setLeads={setLeads}
+                  tasks={tasks}
+                  setTasks={setTasks}
+                  onNavigateOrgChart={() => setActiveWorkspace('orgchart')}
                 />
-              ) : currentUser.role === 'PARTNER_ADMIN' && currentPartnerObj ? (
+              ) : (currentUser.role === 'PARTNER_ADMIN' || currentUser.role === 'PARTNER_ADMIN_GLOBAL') && currentPartnerObj ? (
                 <PartnerDashboard
                   currentUser={currentUser}
                   currentPartner={currentPartnerObj}
@@ -606,6 +650,11 @@ export default function App() {
                   users={users}
                   setUsers={setUsers}
                   setAuditLogs={setAuditLogs}
+                  leads={leads}
+                  setLeads={setLeads}
+                  tasks={tasks}
+                  setTasks={setTasks}
+                  onNavigateOrgChart={() => setActiveWorkspace('orgchart')}
                 />
               ) : currentUser.role === 'CUSTOMER_ADMIN' && currentCustomerObj ? (
                 <CustomerDashboard

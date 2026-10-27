@@ -1,11 +1,34 @@
-import React, { useState } from 'react';
-import { Partner, Customer, PortalUser, AuditLog, WorkspaceRequest } from '../types';
+import React, { useState, useRef } from 'react';
+import { Partner, Customer, PortalUser, AuditLog, WorkspaceRequest, Lead, Task } from '../types';
 import { FALLBACK_GREYED_REQUESTS } from '../mockData';
+import PartnerDashboard from './PartnerDashboard';
+import CustomerDashboard from './CustomerDashboard';
 import { 
   Building2, Users, Key, Plus, Trash2, ArrowRight, CheckCircle2, 
   HelpCircle, Eye, Shield, Globe, Sparkles, Activity, FileCheck, Check,
-  Inbox, X, Search
+  Inbox, X, Search, Upload, Download, FileSpreadsheet, FolderOpen, Image,
+  AlertCircle, Play, Database, Server, RefreshCw, UserPlus, FileUp, ArrowLeft
 } from 'lucide-react';
+
+export const HR_SYSTEMS_LIST = [
+  'ADP Workforce Now',
+  'BambooHR',
+  'Gusto',
+  'HiBob',
+  'Insperity',
+  'Oracle Fusion Cloud HCM',
+  'Paychex Flex',
+  'Paycom',
+  'Paylocity',
+  'Paycor',
+  'Personio',
+  'Rippling',
+  'SAP SuccessFactors HXM',
+  'TriNet',
+  'UKG Pro / UKG Ready',
+  'Workday HCM',
+  'Zoho People',
+] as const;
 
 interface SuperAdminDashboardProps {
   currentUser: PortalUser;
@@ -20,6 +43,11 @@ interface SuperAdminDashboardProps {
   openRequests?: WorkspaceRequest[];
   setOpenRequests?: React.Dispatch<React.SetStateAction<WorkspaceRequest[]>>;
   onNavigateSetup?: () => void;
+  leads?: Lead[];
+  setLeads?: React.Dispatch<React.SetStateAction<Lead[]>>;
+  tasks?: Task[];
+  setTasks?: React.Dispatch<React.SetStateAction<Task[]>>;
+  onNavigateOrgChart?: () => void;
 }
 
 export default function SuperAdminDashboard({
@@ -34,8 +62,17 @@ export default function SuperAdminDashboard({
   setAuditLogs,
   openRequests,
   setOpenRequests,
-  onNavigateSetup
+  onNavigateSetup,
+  leads,
+  setLeads,
+  tasks,
+  setTasks,
+  onNavigateOrgChart
 }: SuperAdminDashboardProps) {
+
+  // Direct dashboard view state for Resellers and Customers
+  const [viewingResellerDashboard, setViewingResellerDashboard] = useState<Partner | null>(null);
+  const [viewingCustomerDashboard, setViewingCustomerDashboard] = useState<Customer | null>(null);
 
   const [activeTab, setActiveTab] = useState<'partners' | 'customers' | 'admins' | 'audit'>('partners');
   
@@ -54,20 +91,83 @@ export default function SuperAdminDashboard({
   const [hoverPartnerSearch, setHoverPartnerSearch] = useState('');
   const [staticPartnerSearch, setStaticPartnerSearch] = useState('');
   const [isHoverSearchFocused, setIsHoverSearchFocused] = useState(false);
-  const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(() => partners.length > 0 ? partners[0].id : null);
+  // Core Partners & Total Customers State (Initially null, mutually exclusive, toggleable unselect)
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [partnerActionNotice, setPartnerActionNotice] = useState<string | null>(null);
+  const [customerActionNotice, setCustomerActionNotice] = useState<string | null>(null);
 
-  const selectedPartner = partners.find(p => p.id === selectedPartnerId) || null;
+  // Dedicated Management Panel State
+  const [isManagementPanelOpen, setIsManagementPanelOpen] = useState(false);
+  const [managementActiveTab, setManagementActiveTab] = useState<'logo' | 'admins' | 'setup'>('logo');
+
+  // Management Panel: Logo Upload & Approve State
+  const [stagedLogoUrl, setStagedLogoUrl] = useState<string | null>(null);
+  const [stagedLogoFileName, setStagedLogoFileName] = useState<string | null>(null);
+  const [logoActionNotice, setLogoActionNotice] = useState<string | null>(null);
+  const [isLogoDragActive, setIsLogoDragActive] = useState(false);
+  const [isReplacingLogo, setIsReplacingLogo] = useState(false);
+  const logoFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Management Panel: Admin Management State
+  const [adminFirstName, setAdminFirstName] = useState('');
+  const [adminLastName, setAdminLastName] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminActionNotice, setAdminActionNotice] = useState<string | null>(null);
+  const [isAdminCsvDragActive, setIsAdminCsvDragActive] = useState(false);
+  const adminCsvInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Management Panel: The Three Setup Options State
+  const [selectedSetupOption, setSelectedSetupOption] = useState<'sandbox' | 'csv' | 'hris'>('sandbox');
+  const [selectedCsvHrSystem, setSelectedCsvHrSystem] = useState<string>('ADP Workforce Now');
+  const [selectedHrisHrSystem, setSelectedHrisHrSystem] = useState<string>('');
+  const [adpFileName, setAdpFileName] = useState<string | null>(null);
+  const [adpRecordCount, setAdpRecordCount] = useState<number | null>(null);
+  const [adpUploadSuccess, setAdpUploadSuccess] = useState<string | null>(null);
+  const [isAdpDragActive, setIsAdpDragActive] = useState(false);
+  const adpFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const selectedPartner = selectedPartnerId ? partners.find(p => p.id === selectedPartnerId) || null : null;
+  const selectedCustomer = selectedCustomerId ? customers.find(c => c.id === selectedCustomerId) || null : null;
 
   const handleSelectPartner = (p: Partner | null) => {
     if (!p) {
       setSelectedPartnerId(null);
-      setPartnerActionNotice('Partner selection cleared.');
+      setViewingResellerDashboard(null);
+      setPartnerActionNotice('Reseller unselected.');
     } else {
       setSelectedPartnerId(p.id);
-      setPartnerActionNotice(`Selected active partner: "${p.name}"`);
+      setSelectedCustomerId(null); // Mutually exclusive: clear customer
+      setViewingCustomerDashboard(null);
+      setViewingResellerDashboard(p); // Opens the dashboard for that reseller!
+      setPartnerActionNotice(`Opened Reseller Dashboard: "${p.name}"`);
+      setStagedLogoUrl(null);
+      setStagedLogoFileName(null);
+      setIsReplacingLogo(false);
+      setAdminActionNotice(null);
+      setAdpUploadSuccess(null);
     }
     setTimeout(() => setPartnerActionNotice(null), 4000);
+  };
+
+  const handleSelectCustomer = (c: Customer | null) => {
+    if (!c) {
+      setSelectedCustomerId(null);
+      setViewingCustomerDashboard(null);
+      setCustomerActionNotice('Customer unselected.');
+    } else {
+      setSelectedCustomerId(c.id);
+      setSelectedPartnerId(null); // Mutually exclusive: clear partner
+      setViewingResellerDashboard(null);
+      setViewingCustomerDashboard(c); // Opens the dashboard for that customer!
+      setCustomerActionNotice(`Opened Customer Dashboard: "${c.name}"`);
+      setStagedLogoUrl(null);
+      setStagedLogoFileName(null);
+      setIsReplacingLogo(false);
+      setAdminActionNotice(null);
+      setAdpUploadSuccess(null);
+    }
+    setTimeout(() => setCustomerActionNotice(null), 4000);
   };
 
   const filteredHoverPartners = partners.filter(p => 
@@ -85,21 +185,7 @@ export default function SuperAdminDashboard({
   const [hoverCustomerSearch, setHoverCustomerSearch] = useState('');
   const [staticCustomerSearch, setStaticCustomerSearch] = useState('');
   const [isHoverCustomerSearchFocused, setIsHoverCustomerSearchFocused] = useState(false);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(() => customers.length > 0 ? customers[0].id : null);
-  const [customerActionNotice, setCustomerActionNotice] = useState<string | null>(null);
 
-  const selectedCustomer = customers.find(c => c.id === selectedCustomerId) || null;
-
-  const handleSelectCustomer = (c: Customer | null) => {
-    if (!c) {
-      setSelectedCustomerId(null);
-      setCustomerActionNotice('Customer selection cleared.');
-    } else {
-      setSelectedCustomerId(c.id);
-      setCustomerActionNotice(`Selected active customer: "${c.name}"`);
-    }
-    setTimeout(() => setCustomerActionNotice(null), 4000);
-  };
 
   const filteredHoverCustomers = customers.filter(c => 
     !hoverCustomerSearch.trim() || c.name.toLowerCase().includes(hoverCustomerSearch.toLowerCase().trim())
@@ -353,8 +439,1355 @@ export default function SuperAdminDashboard({
     setDenyTarget(null);
   };
 
+  // Helper: Process logo file upload (supports Vector SVG XML, XML files, PNG, JPG, WebP)
+  const handleLogoFileProcess = (file: File) => {
+    setStagedLogoFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      if (result) {
+        setStagedLogoUrl(result);
+        setLogoActionNotice(null);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Helper: Approve staged logo and commit to partner/customer record
+  const handleApproveLogo = () => {
+    if (!stagedLogoUrl) return;
+    if (selectedPartner) {
+      setPartners(prev => prev.map(p => p.id === selectedPartner.id ? { ...p, logoUrl: stagedLogoUrl } : p));
+      addAudit('PARTNER_LOGO_APPROVED', `Super Admin approved new vector/image logo for partner "${selectedPartner.name}".`, 'info');
+      setLogoActionNotice(`✓ Vector logo approved and deployed for partner "${selectedPartner.name}".`);
+    } else if (selectedCustomer) {
+      setCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? { ...c, logoUrl: stagedLogoUrl } : c));
+      addAudit('CUSTOMER_LOGO_APPROVED', `Super Admin approved new vector/image logo for customer "${selectedCustomer.name}".`, 'info');
+      setLogoActionNotice(`✓ Vector logo approved and deployed for customer "${selectedCustomer.name}".`);
+    }
+    setStagedLogoUrl(null);
+    setStagedLogoFileName(null);
+    setIsReplacingLogo(false);
+    setTimeout(() => setLogoActionNotice(null), 5000);
+  };
+
+  // Helper: Delete current logo for partner or customer
+  const handleDeleteLogo = () => {
+    if (selectedPartner) {
+      setPartners(prev => prev.map(p => p.id === selectedPartner.id ? { ...p, logoUrl: '' } : p));
+      addAudit('PARTNER_LOGO_DELETED', `Super Admin removed logo for partner "${selectedPartner.name}".`, 'warning');
+      setLogoActionNotice(`✓ Logo deleted for partner "${selectedPartner.name}". You can now upload a new logo.`);
+    } else if (selectedCustomer) {
+      setCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? { ...c, logoUrl: '' } : c));
+      addAudit('CUSTOMER_LOGO_DELETED', `Super Admin removed logo for customer "${selectedCustomer.name}".`, 'warning');
+      setLogoActionNotice(`✓ Logo deleted for customer "${selectedCustomer.name}". You can now upload a new logo.`);
+    }
+    setStagedLogoUrl(null);
+    setStagedLogoFileName(null);
+    setIsReplacingLogo(false);
+    setTimeout(() => setLogoActionNotice(null), 5000);
+  };
+
+  // Helper: Download Admin CSV Template
+  const handleDownloadAdminTemplate = () => {
+    const csvContent = 'First Name,Last Name,Email Address\r\nJane,Doe,jane.doe@company.com\r\nAlex,Smith,alex.smith@company.com\r\n';
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'admin_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Helper: Add individual admin
+  const handleAddSingleAdmin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminFirstName.trim() || !adminLastName.trim() || !adminEmail.trim()) {
+      setAdminActionNotice('Please fill out First Name, Last Name, and Email Address.');
+      return;
+    }
+    if (!adminEmail.includes('@')) {
+      setAdminActionNotice('Please provide a valid email address.');
+      return;
+    }
+
+    const role = selectedPartner ? 'PARTNER_ADMIN' : 'CUSTOMER_ADMIN';
+    const newAdmin: PortalUser = {
+      id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      name: `${adminFirstName.trim()} ${adminLastName.trim()}`,
+      email: adminEmail.trim(),
+      role,
+      partnerId: selectedPartner ? selectedPartner.id : null,
+      customerId: selectedCustomer ? selectedCustomer.id : null,
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&q=80',
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      mfaEnabled: false
+    };
+
+    setUsers(prev => [newAdmin, ...prev]);
+    const targetName = selectedPartner?.name || selectedCustomer?.name || 'entity';
+    addAudit(
+      'ADMIN_ADDED',
+      `Super Admin added ${newAdmin.name} (${newAdmin.email}) as administrator for ${targetName}.`,
+      'security'
+    );
+    setAdminActionNotice(`✓ Added ${newAdmin.name} (${newAdmin.email}) as administrator!`);
+    setAdminFirstName('');
+    setAdminLastName('');
+    setAdminEmail('');
+    setTimeout(() => setAdminActionNotice(null), 4000);
+  };
+
+  // Helper: Process bulk admins CSV
+  const handleAdminCsvFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      if (!text) return;
+
+      const lines = text.split(/\r?\n/);
+      const newAdminUsers: PortalUser[] = [];
+
+      lines.forEach((line, idx) => {
+        if (!line.trim()) return;
+        if (idx === 0 && (line.toLowerCase().includes('first') || line.toLowerCase().includes('email'))) {
+          return;
+        }
+        const parts = line.split(',').map(s => s.trim().replace(/^["']|["']$/g, ''));
+        if (parts.length >= 3) {
+          const firstName = parts[0];
+          const lastName = parts[1];
+          const email = parts[2];
+          if (email && email.includes('@') && !users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
+            const role = selectedPartner ? 'PARTNER_ADMIN' : 'CUSTOMER_ADMIN';
+            newAdminUsers.push({
+              id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              name: `${firstName} ${lastName}`.trim() || email.split('@')[0],
+              email,
+              role,
+              partnerId: selectedPartner ? selectedPartner.id : null,
+              customerId: selectedCustomer ? selectedCustomer.id : null,
+              avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&q=80',
+              isActive: true,
+              createdAt: new Date().toISOString(),
+              mfaEnabled: false
+            });
+          }
+        }
+      });
+
+      if (newAdminUsers.length > 0) {
+        setUsers(prev => [...newAdminUsers, ...prev]);
+        const targetName = selectedPartner?.name || selectedCustomer?.name || 'entity';
+        addAudit(
+          'ADMINS_BULK_IMPORTED',
+          `Imported ${newAdminUsers.length} administrators for ${targetName} via CSV.`,
+          'security'
+        );
+        setAdminActionNotice(`✓ Successfully added ${newAdminUsers.length} administrators from CSV.`);
+      } else {
+        setAdminActionNotice('No new valid admin rows found. Ensure CSV columns are: First Name, Last Name, Email Address.');
+      }
+      setTimeout(() => setAdminActionNotice(null), 5000);
+    };
+    reader.readAsText(file);
+  };
+
+  // Helper: Process ADP Workforce Now CSV
+  const handleAdpCsvFile = (file: File) => {
+    setAdpFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const lines = text ? text.split(/\r?\n/).filter(line => line.trim().length > 0) : [];
+      const rowCount = Math.max(lines.length - 1, 1);
+      setAdpRecordCount(rowCount);
+      setAdpUploadSuccess(`Standard ADP Workforce Now CSV verified (${rowCount} employee records). Ready for sync into ${selectedPartner?.name || selectedCustomer?.name}.`);
+      addAudit(
+        'ADP_CSV_VERIFIED',
+        `Super Admin loaded standard ADP Workforce Now CSV "${file.name}" with ${rowCount} records for ${selectedPartner?.name || selectedCustomer?.name}.`,
+        'info'
+      );
+    };
+    reader.readAsText(file);
+  };
+
+  // Helper: Launch Cinema Tech Sandbox
+  const handleLaunchSandbox = () => {
+    const targetName = selectedPartner?.name || selectedCustomer?.name || 'Workspace';
+    addAudit(
+      'SANDBOX_LAUNCHED',
+      `Super Admin launched Cinema Tech interactive org chart sandbox for ${targetName}.`,
+      'info'
+    );
+    if (onNavigateSetup) {
+      onNavigateSetup();
+    } else if (typeof window !== 'undefined') {
+      window.location.href = '/ORG/Setup';
+    }
+  };
+
+  // Render the Dedicated Management Panel Modal
+  const renderManagementPanelModal = () => {
+    if (!isManagementPanelOpen || (!selectedPartner && !selectedCustomer)) {
+      return null;
+    }
+
+    const activeEntity = selectedPartner || selectedCustomer!;
+    const isPartner = Boolean(selectedPartner);
+    const entityTypeLabel = isPartner ? 'Reselling Partner' : 'Customer Workspace';
+    const accentColor = activeEntity.accentColor || (isPartner ? '#3b82f6' : '#10b981');
+    const assignedAdmins = users.filter(u => 
+      isPartner ? u.partnerId === activeEntity.id && u.role === 'PARTNER_ADMIN' 
+                : u.customerId === activeEntity.id && u.role === 'CUSTOMER_ADMIN'
+    );
+
+    return (
+      <div 
+        className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200"
+        onClick={() => setIsManagementPanelOpen(false)}
+      >
+        <div 
+          className="max-w-4xl w-full bg-[#0d0e14] border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] my-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Panel Header */}
+          <div className="p-5 border-b border-neutral-800/80 flex items-center justify-between gap-4 bg-neutral-905">
+            <div className="flex items-center gap-3.5 min-w-0">
+              {activeEntity.logoUrl ? (
+                <img 
+                  src={activeEntity.logoUrl} 
+                  alt={activeEntity.name} 
+                  className="w-12 h-12 rounded-xl object-cover bg-neutral-800 border border-neutral-700 shadow-sm shrink-0"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLElement).style.display = 'none';
+                  }}
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-neutral-400 shrink-0">
+                  <Image className="w-6 h-6 text-neutral-400" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span 
+                    className="text-[10px] font-mono uppercase px-2 py-0.5 rounded font-bold border"
+                    style={{ 
+                      backgroundColor: `${accentColor}20`,
+                      borderColor: `${accentColor}50`,
+                      color: accentColor 
+                    }}
+                  >
+                    {entityTypeLabel} Management
+                  </span>
+                  <span className="text-[11px] font-mono text-neutral-500">ID: {activeEntity.id}</span>
+                </div>
+                <h3 className="text-xl font-bold text-white truncate mt-0.5">{activeEntity.name}</h3>
+                <p className="text-xs text-neutral-400 font-mono">
+                  {isPartner 
+                    ? `Domain: ${(activeEntity as Partner).domain || 'No custom domain configured'}`
+                    : `Parent Reseller: ${partners.find(p => p.id === (activeEntity as Customer).partnerId)?.name || 'Direct Retail Account'}`}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsManagementPanelOpen(false)}
+              className="p-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition-colors cursor-pointer shrink-0"
+              title="Close Management Panel"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Subnavigation Tabs */}
+          <div className="flex border-b border-neutral-800 bg-[#090a0f] px-5 gap-2 overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => setManagementActiveTab('logo')}
+              className={`flex items-center gap-2 py-3 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                managementActiveTab === 'logo'
+                  ? 'border-emerald-500 text-white bg-neutral-900/60'
+                  : 'border-transparent text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              <Image className="w-4 h-4 text-emerald-400" />
+              <span>Logo & Vector Graphic</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setManagementActiveTab('admins')}
+              className={`flex items-center gap-2 py-3 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                managementActiveTab === 'admins'
+                  ? 'border-blue-500 text-white bg-neutral-900/60'
+                  : 'border-transparent text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              <Users className="w-4 h-4 text-blue-400" />
+              <span>Administrators ({assignedAdmins.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setManagementActiveTab('setup')}
+              className={`flex items-center gap-2 py-3 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                managementActiveTab === 'setup'
+                  ? 'border-amber-500 text-white bg-neutral-900/60'
+                  : 'border-transparent text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              <Server className="w-4 h-4 text-amber-400" />
+              <span>The Three Setup Options</span>
+            </button>
+          </div>
+
+          {/* Body Content */}
+          <div className="p-6 overflow-y-auto space-y-6 flex-1">
+            {/* TAB 1: LOGO UPLOAD & APPROVE / MANAGE */}
+            {managementActiveTab === 'logo' && (() => {
+              const hasUploadedLogo = Boolean(activeEntity.logoUrl && activeEntity.logoUrl.trim() !== '');
+              const showUploadWindow = !hasUploadedLogo || isReplacingLogo;
+
+              return (
+                <div className="space-y-5 animate-in fade-in duration-150">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <Image className="w-4 h-4 text-emerald-400" />
+                        <span>Logo & Brand Asset ({entityTypeLabel})</span>
+                      </h4>
+                      <p className="text-xs text-neutral-400 mt-1">
+                        {hasUploadedLogo && !isReplacingLogo
+                          ? `Currently active branding for ${activeEntity.name}. You can delete or replace this logo below.`
+                          : `Upload your organization's vector logo (SVG / XML vector definition) or high-res PNG / JPG.`}
+                      </p>
+                    </div>
+
+                    {hasUploadedLogo && !isReplacingLogo && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setIsReplacingLogo(true)}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-blue-900/30 cursor-pointer flex items-center gap-1.5"
+                          title="Replace existing logo"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Replace</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleDeleteLogo}
+                          className="px-3 py-1.5 bg-red-950/70 hover:bg-red-900 text-red-300 hover:text-white rounded-lg text-xs font-bold border border-red-800/70 transition-all cursor-pointer flex items-center gap-1.5"
+                          title="Delete logo"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {logoActionNotice && (
+                    <div className="p-3 bg-emerald-950/50 border border-emerald-800/80 rounded-xl text-xs text-emerald-300 flex items-center justify-between">
+                      <span>{logoActionNotice}</span>
+                      <button type="button" onClick={() => setLogoActionNotice(null)} className="text-neutral-400 hover:text-white cursor-pointer">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* DISPLAY ALREADY UPLOADED LOGO (Upload window is NOT displayed) */}
+                  {hasUploadedLogo && !isReplacingLogo && !stagedLogoUrl && (
+                    <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-6 space-y-4">
+                      <div className="flex items-center justify-between pb-3 border-b border-neutral-850">
+                        <div className="flex items-center gap-2">
+                          <Shield className="w-4 h-4 text-emerald-400" />
+                          <h5 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
+                            Already Uploaded Logo
+                          </h5>
+                        </div>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                          Live & Approved
+                        </span>
+                      </div>
+
+                      {/* Display already uploaded logo box */}
+                      <div className="bg-neutral-900/70 border border-neutral-800 rounded-xl p-8 flex flex-col items-center justify-center min-h-[220px] text-center relative overflow-hidden">
+                        <img 
+                          src={activeEntity.logoUrl} 
+                          alt={`${activeEntity.name} Logo`} 
+                          className="max-h-28 max-w-full object-contain mb-3 drop-shadow-md"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="text-sm font-bold text-white mt-1">
+                          {activeEntity.name}
+                        </div>
+                        <span className="text-[11px] font-mono text-neutral-400 mt-0.5">
+                          Active production logo asset for this {entityTypeLabel.toLowerCase()}
+                        </span>
+
+                        {/* Options to Delete or Replace */}
+                        <div className="flex items-center gap-3 mt-6">
+                          <button
+                            type="button"
+                            onClick={() => setIsReplacingLogo(true)}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-blue-900/30 cursor-pointer flex items-center gap-1.5"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            <span>Replace Logo</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleDeleteLogo}
+                            className="px-4 py-2 bg-red-950/70 hover:bg-red-900 text-red-300 hover:text-white rounded-lg text-xs font-bold border border-red-800/70 transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete Logo</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* DISPLAY UPLOAD WINDOW (Only when no logo exists, or when user clicks Replace) */}
+                  {showUploadWindow && (
+                    <div className="space-y-4">
+                      {isReplacingLogo && (
+                        <div className="flex items-center justify-between p-3.5 bg-blue-950/40 border border-blue-800/60 rounded-xl text-xs text-blue-200">
+                          <div className="flex items-center gap-2">
+                            <RefreshCw className="w-4 h-4 text-blue-400 shrink-0" />
+                            <span>
+                              Replacing existing logo for <strong>{activeEntity.name}</strong>. Upload a new vector XML or image file below.
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsReplacingLogo(false);
+                              setStagedLogoUrl(null);
+                              setStagedLogoFileName(null);
+                            }}
+                            className="px-2.5 py-1 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white rounded-lg text-[11px] font-mono border border-neutral-700 transition-colors cursor-pointer"
+                          >
+                            Cancel Replacement
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Upload Drag & Drop Zone */}
+                      <input
+                        ref={logoFileInputRef}
+                        type="file"
+                        accept=".svg,.xml,image/svg+xml,image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleLogoFileProcess(e.target.files[0]);
+                          }
+                        }}
+                      />
+
+                      <div
+                        onDragOver={(e) => { e.preventDefault(); setIsLogoDragActive(true); }}
+                        onDragLeave={() => setIsLogoDragActive(false)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setIsLogoDragActive(false);
+                          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                            handleLogoFileProcess(e.dataTransfer.files[0]);
+                          }
+                        }}
+                        onClick={() => logoFileInputRef.current?.click()}
+                        className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
+                          isLogoDragActive 
+                            ? 'border-emerald-400 bg-emerald-950/20' 
+                            : 'border-neutral-750 bg-neutral-900/40 hover:border-neutral-600 hover:bg-neutral-900/70'
+                        }`}
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-neutral-800 border border-neutral-700 flex items-center justify-center mx-auto mb-3 text-neutral-400">
+                          <Upload className="w-6 h-6 text-emerald-400" />
+                        </div>
+                        <h5 className="text-xs font-bold text-white">Click to browse or drop Logo XML / SVG / Image file</h5>
+                        <p className="text-[11px] text-neutral-400 mt-1">
+                          Accepts Vector SVG XML (.svg, .xml) or Raster formats (.png, .jpg, .webp)
+                        </p>
+                      </div>
+
+                      {/* The Logo Preview & Approve Box */}
+                      {stagedLogoUrl && (
+                        <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-5 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Shield className="w-4 h-4 text-emerald-400" />
+                              <h5 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
+                                Staged Logo Pending Approval
+                              </h5>
+                            </div>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+                              Awaiting Approval
+                            </span>
+                          </div>
+
+                          <div className="bg-neutral-900/70 border border-neutral-800 rounded-xl p-6 flex flex-col items-center justify-center min-h-[170px] text-center relative overflow-hidden">
+                            <img 
+                              src={stagedLogoUrl} 
+                              alt="Logo Preview" 
+                              className="max-h-24 max-w-full object-contain mb-3 drop-shadow-md"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div className="text-xs font-mono text-neutral-300 font-semibold">
+                              {stagedLogoFileName || `${activeEntity.name} Staged Logo`}
+                            </div>
+                            <span className="text-[11px] font-mono text-neutral-500 mt-0.5">
+                              Uploaded file staged in memory — click Approve Logo below to commit
+                            </span>
+
+                            <div className="flex items-center gap-2.5 mt-5">
+                              <button
+                                type="button"
+                                onClick={handleApproveLogo}
+                                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
+                              >
+                                <Check className="w-4 h-4" />
+                                <span>Approve Logo</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setStagedLogoUrl(null);
+                                  setStagedLogoFileName(null);
+                                }}
+                                className="px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                              >
+                                Discard
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* TAB 2: ADMINISTRATORS MANAGEMENT */}
+            {managementActiveTab === 'admins' && (
+              <div className="space-y-6 animate-in fade-in duration-150">
+                <div>
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Users className="w-4 h-4 text-blue-400" />
+                    <span>Administrator Management for {activeEntity.name}</span>
+                  </h4>
+                  <p className="text-xs text-neutral-400 mt-1">
+                    Add individual administrators or bulk import via CSV with First Name, Last Name, and Email Address.
+                  </p>
+                </div>
+
+                {adminActionNotice && (
+                  <div className="p-3 bg-blue-950/50 border border-blue-800/80 rounded-xl text-xs text-blue-300 flex items-center justify-between">
+                    <span>{adminActionNotice}</span>
+                    <button type="button" onClick={() => setAdminActionNotice(null)} className="text-neutral-400 hover:text-white cursor-pointer">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Single Admin Form */}
+                  <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-5 space-y-3.5">
+                    <h5 className="text-xs font-bold text-white flex items-center gap-1.5 uppercase font-mono tracking-wider">
+                      <UserPlus className="w-3.5 h-3.5 text-blue-400" /> Add Individual Administrator
+                    </h5>
+                    <form onSubmit={handleAddSingleAdmin} className="space-y-3">
+                      <div>
+                        <label className="block text-[10px] uppercase font-mono text-neutral-400 mb-1">First Name</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Eleanor"
+                          value={adminFirstName}
+                          onChange={(e) => setAdminFirstName(e.target.value)}
+                          className="w-full bg-neutral-900 border border-neutral-700/80 rounded-lg px-3 py-1.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500 transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase font-mono text-neutral-400 mb-1">Last Name</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Vance"
+                          value={adminLastName}
+                          onChange={(e) => setAdminLastName(e.target.value)}
+                          className="w-full bg-neutral-900 border border-neutral-700/80 rounded-lg px-3 py-1.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500 transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase font-mono text-neutral-400 mb-1">Email Address</label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="e.g. eleanor.vance@company.com"
+                          value={adminEmail}
+                          onChange={(e) => setAdminEmail(e.target.value)}
+                          className="w-full bg-neutral-900 border border-neutral-700/80 rounded-lg px-3 py-1.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500 transition-colors"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 rounded-lg text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-blue-900/30"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Administrator</span>
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Bulk CSV Upload & Template */}
+                  <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-5 space-y-3.5 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <h5 className="text-xs font-bold text-white flex items-center gap-1.5 uppercase font-mono tracking-wider">
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" /> Bulk Admin Import (CSV)
+                        </h5>
+                        <button
+                          type="button"
+                          onClick={handleDownloadAdminTemplate}
+                          className="px-2.5 py-1 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 border border-neutral-700 rounded-lg text-[11px] font-mono flex items-center gap-1.5 transition-colors cursor-pointer"
+                          title="Download sample CSV template with First Name, Last Name, Email Address"
+                        >
+                          <Download className="w-3 h-3 text-emerald-400" />
+                          <span>CSV Template</span>
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-neutral-400 mt-2">
+                        Download the CSV template with columns: <strong className="text-neutral-200">First Name, Last Name, Email Address</strong>, then upload your completed file.
+                      </p>
+                    </div>
+
+                    <input
+                      ref={adminCsvInputRef}
+                      type="file"
+                      accept=".csv"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleAdminCsvFile(e.target.files[0]);
+                        }
+                      }}
+                    />
+
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); setIsAdminCsvDragActive(true); }}
+                      onDragLeave={() => setIsAdminCsvDragActive(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setIsAdminCsvDragActive(false);
+                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                          handleAdminCsvFile(e.dataTransfer.files[0]);
+                        }
+                      }}
+                      onClick={() => adminCsvInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-xl p-4 text-center transition-all cursor-pointer mt-2 ${
+                        isAdminCsvDragActive
+                          ? 'border-blue-400 bg-blue-950/20'
+                          : 'border-neutral-750 bg-neutral-900/40 hover:border-neutral-600 hover:bg-neutral-900/70'
+                      }`}
+                    >
+                      <Upload className="w-5 h-5 text-blue-400 mx-auto mb-1.5" />
+                      <span className="text-xs font-semibold text-white block">Click to select or drop CSV</span>
+                      <span className="text-[10px] text-neutral-400 font-mono mt-0.5 block">Requires First Name, Last Name, Email Address</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Assigned Admins Roster */}
+                <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-bold text-white uppercase font-mono tracking-wider">
+                      Currently Assigned Administrators ({assignedAdmins.length})
+                    </h5>
+                    <span className="text-[10px] font-mono text-neutral-400">
+                      Role: {isPartner ? 'PARTNER_ADMIN' : 'CUSTOMER_ADMIN'}
+                    </span>
+                  </div>
+
+                  {assignedAdmins.length === 0 ? (
+                    <div className="py-8 text-center text-neutral-500 text-xs">
+                      No dedicated administrators assigned to {activeEntity.name} yet. Use the form above or import a CSV.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="border-b border-neutral-800 text-[10px] font-mono uppercase text-neutral-400">
+                            <th className="py-2 px-3">Name</th>
+                            <th className="py-2 px-3">Email</th>
+                            <th className="py-2 px-3">Role</th>
+                            <th className="py-2 px-3 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-900">
+                          {assignedAdmins.map((adm) => (
+                            <tr key={adm.id} className="hover:bg-neutral-900/50 transition-colors">
+                              <td className="py-2.5 px-3 font-semibold text-white flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-neutral-800 text-neutral-300 font-bold flex items-center justify-center text-[10px] border border-neutral-700">
+                                  {adm.name.charAt(0)}
+                                </div>
+                                <span>{adm.name}</span>
+                              </td>
+                              <td className="py-2.5 px-3 font-mono text-neutral-300">{adm.email}</td>
+                              <td className="py-2.5 px-3">
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                  {adm.role}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => deleteUser(adm.id, adm.name)}
+                                  className="text-red-400 hover:text-red-300 text-xs font-semibold cursor-pointer p-1"
+                                  title="Revoke administrator access"
+                                >
+                                  Revoke
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: THE THREE SETUP OPTIONS */}
+            {managementActiveTab === 'setup' && (
+              <div className="space-y-6 animate-in fade-in duration-150">
+                <div>
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Server className="w-4 h-4 text-amber-400" />
+                    <span>The Three Setup Options for {activeEntity.name}</span>
+                  </h4>
+                  <p className="text-xs text-neutral-400 mt-1">
+                    Configure workforce data onboarding via Interactive Sandbox, CSV Upload, or Direct HRIS Integration.
+                  </p>
+                </div>
+
+                {/* 3 Option Selector Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Option 1: Interactive Sandbox */}
+                  <div
+                    onClick={() => setSelectedSetupOption('sandbox')}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+                      selectedSetupOption === 'sandbox'
+                        ? 'bg-amber-950/20 border-amber-500 shadow-md shadow-amber-950/30'
+                        : 'bg-neutral-950 border-neutral-800 hover:border-neutral-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <Sparkles className="w-5 h-5 text-amber-400" />
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+                          Option 1
+                        </span>
+                      </div>
+                      <h5 className="text-xs font-bold text-white">Interactive Sandbox</h5>
+                      <p className="text-[11px] text-neutral-400 mt-1">
+                        Pre-populated with Cinema Tech sample organizational chart and hierarchy.
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-mono text-amber-400 mt-3 font-semibold">
+                      {selectedSetupOption === 'sandbox' ? '● Currently Selected' : 'Click to Configure'}
+                    </span>
+                  </div>
+
+                  {/* Option 2: CSV Upload */}
+                  <div
+                    onClick={() => setSelectedSetupOption('csv')}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+                      selectedSetupOption === 'csv'
+                        ? 'bg-blue-950/20 border-blue-500 shadow-md shadow-blue-950/30'
+                        : 'bg-neutral-950 border-neutral-800 hover:border-neutral-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <FileSpreadsheet className="w-5 h-5 text-blue-400" />
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold">
+                          Option 2
+                        </span>
+                      </div>
+                      <h5 className="text-xs font-bold text-white">CSV Upload</h5>
+                      <p className="text-[11px] text-neutral-400 mt-1">
+                        HR System export upload. Supports standard ADP Workforce Now export.
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-mono text-blue-400 mt-3 font-semibold">
+                      {selectedSetupOption === 'csv' ? '● Currently Selected' : 'Click to Configure'}
+                    </span>
+                  </div>
+
+                  {/* Option 3: HRIS Integration */}
+                  <div
+                    onClick={() => setSelectedSetupOption('hris')}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+                      selectedSetupOption === 'hris'
+                        ? 'bg-purple-950/20 border-purple-500 shadow-md shadow-purple-950/30'
+                        : 'bg-neutral-950 border-neutral-800 hover:border-neutral-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <Database className="w-5 h-5 text-purple-400" />
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold">
+                          Option 3
+                        </span>
+                      </div>
+                      <h5 className="text-xs font-bold text-white">HRIS Integration</h5>
+                      <p className="text-[11px] text-neutral-400 mt-1">
+                        Direct API gateway integration (all 17 systems currently in development).
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-mono text-purple-400 mt-3 font-semibold">
+                      {selectedSetupOption === 'hris' ? '● Currently Selected' : 'Click to Configure'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* DETAILED VIEW: OPTION 1 - SANDBOX */}
+                {selectedSetupOption === 'sandbox' && (
+                  <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-6 space-y-4 animate-in fade-in duration-150">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                        <Sparkles className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h5 className="text-sm font-bold text-white">Cinema Tech Interactive Sandbox</h5>
+                        <p className="text-xs text-neutral-400">
+                          Deploy instant pre-populated organizational chart with full Cinema Tech workforce hierarchy.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-neutral-900/60 rounded-xl border border-neutral-850 text-xs text-neutral-300 space-y-2">
+                      <p>
+                        Selecting this sandbox provisions a complete demo environment with 142 employee nodes, 6 functional departments, and full interactive reporting hierarchy.
+                      </p>
+                      <ul className="list-disc list-inside text-neutral-400 space-y-1 font-mono text-[11px]">
+                        <li>Executive Team & Leadership reporting structure</li>
+                        <li>Engineering, Marketing, Sales, Product, Operations divisions</li>
+                        <li>Real-time search, zoom, filter, and department breakdown</li>
+                      </ul>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleLaunchSandbox}
+                      className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-neutral-950 font-bold rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
+                    >
+                      <Play className="w-4 h-4" />
+                      <span>Launch Cinema Tech Sandbox</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* DETAILED VIEW: OPTION 2 - CSV UPLOAD */}
+                {selectedSetupOption === 'csv' && (
+                  <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-6 space-y-5 animate-in fade-in duration-150">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                        <FileSpreadsheet className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h5 className="text-sm font-bold text-white">CSV Upload — Direct HR System Export</h5>
+                        <p className="text-xs text-neutral-400">
+                          Select your HR system. Currently ADP Workforce Now is active; other systems are coming soon.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* HR System Pulldown Menu */}
+                    <div>
+                      <label className="block text-xs font-mono uppercase text-neutral-400 mb-1.5 font-bold">
+                        Select HR System
+                      </label>
+                      <select
+                        value={selectedCsvHrSystem}
+                        onChange={(e) => setSelectedCsvHrSystem(e.target.value)}
+                        className="w-full bg-neutral-900 border border-neutral-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
+                      >
+                        {HR_SYSTEMS_LIST.map((sys) => {
+                          const isActive = sys === 'ADP Workforce Now';
+                          return (
+                            <option
+                              key={sys}
+                              value={sys}
+                              disabled={!isActive}
+                              className={isActive ? 'text-white font-semibold bg-neutral-900' : 'text-neutral-500 bg-neutral-950'}
+                            >
+                              {sys} {isActive ? '(Active)' : '(Coming Soon)'}
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <span className="text-[11px] text-neutral-500 font-mono mt-1 block">
+                        All systems except ADP Workforce Now are greyed out (coming soon).
+                      </span>
+                    </div>
+
+                    {/* ADP Workforce Now Upload Method */}
+                    {selectedCsvHrSystem === 'ADP Workforce Now' && (
+                      <div className="space-y-4 pt-2 border-t border-neutral-850">
+                        <div className="p-3.5 bg-blue-950/40 border border-blue-800/60 rounded-xl text-xs text-blue-200">
+                          <p className="font-semibold text-blue-100 flex items-center gap-1.5">
+                            <CheckCircle2 className="w-4 h-4 text-blue-400" />
+                            <span>Standard ADP Workforce Now CSV Export</span>
+                          </p>
+                          <p className="text-[11px] text-neutral-300 mt-1">
+                            This is a standard CSV that must come directly from your ADP Workforce Now reports portal. <strong>No custom template is needed.</strong>
+                          </p>
+                        </div>
+
+                        {adpUploadSuccess && (
+                          <div className="p-3 bg-emerald-950/60 border border-emerald-800 rounded-xl text-xs text-emerald-300 flex items-center justify-between">
+                            <span>{adpUploadSuccess}</span>
+                            <button type="button" onClick={() => setAdpUploadSuccess(null)} className="text-neutral-400 hover:text-white cursor-pointer">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+
+                        <input
+                          ref={adpFileInputRef}
+                          type="file"
+                          accept=".csv"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              handleAdpCsvFile(e.target.files[0]);
+                            }
+                          }}
+                        />
+
+                        <div
+                          onDragOver={(e) => { e.preventDefault(); setIsAdpDragActive(true); }}
+                          onDragLeave={() => setIsAdpDragActive(false)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setIsAdpDragActive(false);
+                            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                              handleAdpCsvFile(e.dataTransfer.files[0]);
+                            }
+                          }}
+                          onClick={() => adpFileInputRef.current?.click()}
+                          className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
+                            isAdpDragActive
+                              ? 'border-blue-400 bg-blue-950/30'
+                              : 'border-neutral-750 bg-neutral-900/40 hover:border-neutral-600 hover:bg-neutral-900/70'
+                          }`}
+                        >
+                          <Upload className="w-6 h-6 text-blue-400 mx-auto mb-2" />
+                          <h6 className="text-xs font-bold text-white">Upload ADP Workforce Now CSV Export</h6>
+                          <p className="text-[11px] text-neutral-400 mt-1">
+                            Drop your exported ADP CSV file here or click to browse
+                          </p>
+                          {adpFileName && (
+                            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-500/40 text-blue-200 text-xs font-mono">
+                              <FileCheck className="w-3.5 h-3.5 text-blue-400" />
+                              <span>{adpFileName} ({adpRecordCount} records)</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* DETAILED VIEW: OPTION 3 - HRIS INTEGRATION */}
+                {selectedSetupOption === 'hris' && (
+                  <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-6 space-y-5 animate-in fade-in duration-150">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0">
+                        <Database className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h5 className="text-sm font-bold text-white">HRIS Direct Integration (Real-Time API Gateway)</h5>
+                        <p className="text-xs text-neutral-400">
+                          Direct automated API integration with enterprise human resources information systems.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Informational banner that ALL 17 are in development */}
+                    <div className="p-4 bg-amber-950/40 border border-amber-800/60 rounded-xl text-xs text-amber-200 space-y-1.5">
+                      <div className="flex items-center gap-2 font-bold text-amber-100">
+                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>All HRIS Direct API Gateways In Development (None In Production)</span>
+                      </div>
+                      <p className="text-neutral-300 text-[11px]">
+                        None of the 17 HRIS integrations are currently in production. Direct OAuth API gateways are undergoing SOC-2 compliance testing. All options below are greyed out. Please utilize the <strong>ADP Workforce Now CSV Upload</strong> option or the <strong>Cinema Tech Interactive Sandbox</strong> in the meantime.
+                      </p>
+                    </div>
+
+                    {/* HR System Pulldown Menu - ALL ARE GREYED OUT */}
+                    <div>
+                      <label className="block text-xs font-mono uppercase text-neutral-400 mb-1.5 font-bold">
+                        Select HR System (All 17 Gateways In Development)
+                      </label>
+                      <select
+                        value={selectedHrisHrSystem}
+                        onChange={(e) => setSelectedHrisHrSystem(e.target.value)}
+                        className="w-full bg-neutral-900/60 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-xs text-neutral-400 focus:outline-none transition-colors cursor-not-allowed opacity-80"
+                      >
+                        <option value="" disabled selected>
+                          -- Select HR System (All 17 Currently In Development) --
+                        </option>
+                        {HR_SYSTEMS_LIST.map((sys) => (
+                          <option
+                            key={sys}
+                            value={sys}
+                            disabled
+                            className="text-neutral-500 bg-neutral-950"
+                          >
+                            {sys} (In Development — Coming Soon)
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-[11px] text-neutral-500 font-mono mt-1 block">
+                        All 17 HRIS options are disabled and greyed out as none are currently in production.
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Panel Footer */}
+          <div className="p-4 border-t border-neutral-800/80 bg-neutral-905 flex items-center justify-between">
+            <span className="text-xs font-mono text-neutral-400">
+              Active configuration for <strong className="text-neutral-200">{activeEntity.name}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsManagementPanelOpen(false)}
+              className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Close Panel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderActiveSelectionCard = () => {
+    if (selectedPartner) {
+      return (
+        <div className="bg-neutral-950 rounded-xl border border-blue-500/50 p-5 space-y-4 relative overflow-hidden shadow-xl animate-in fade-in duration-150">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-850">
+            <div className="flex items-center gap-3">
+              {selectedPartner.logoUrl ? (
+                <img 
+                  src={selectedPartner.logoUrl} 
+                  alt={selectedPartner.name} 
+                  className="w-12 h-12 rounded-xl object-cover bg-neutral-800 border border-neutral-700 shadow-md shrink-0" 
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-neutral-400 shrink-0">
+                  <Building2 className="w-6 h-6 text-neutral-400" />
+                </div>
+              )}
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/40 font-bold">
+                    Active Selected Reseller
+                  </span>
+                  <span className="text-xs text-neutral-500 font-mono">ID: {selectedPartner.id}</span>
+                </div>
+                <h3 className="text-lg font-bold text-white mt-1">Active Reseller: {selectedPartner.name}</h3>
+                <p className="text-xs text-neutral-400 font-mono flex items-center gap-1.5 mt-0.5">
+                  <Globe className="w-3.5 h-3.5 text-neutral-500" />
+                  <span>{selectedPartner.domain || 'no domain configured'}</span>
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setViewingResellerDashboard(selectedPartner)}
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-blue-900/30 cursor-pointer flex items-center gap-1.5"
+                title={`Open dashboard for reseller ${selectedPartner.name}`}
+              >
+                <FolderOpen className="w-3.5 h-3.5" />
+                <span>Open Dashboard</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsManagementPanelOpen(true)}
+                className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-lg text-xs font-semibold border border-neutral-700 transition-colors cursor-pointer flex items-center gap-1.5"
+                title={`Setup & Logo for ${selectedPartner.name}`}
+              >
+                <span>Setup & Logo</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectPartner(null)}
+                className="px-2.5 py-1.5 bg-red-950/60 hover:bg-red-900 text-red-300 hover:text-white rounded-lg text-xs font-semibold border border-red-800/60 transition-colors cursor-pointer flex items-center gap-1"
+                title="Unselect active reseller"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Unselect Reseller</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 pt-1">
+            <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
+              <span className="text-[10px] font-mono uppercase text-neutral-500 block">Customer Portals</span>
+              <span className="text-base font-bold text-white font-mono mt-0.5 block">
+                {countCustomers(selectedPartner.id)} Sub-tenants
+              </span>
+            </div>
+            <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
+              <span className="text-[10px] font-mono uppercase text-neutral-500 block">Delegated Admins</span>
+              <span className="text-base font-bold text-white font-mono mt-0.5 block">
+                {countAdmins(selectedPartner.id, 'partner')} Accounts
+              </span>
+            </div>
+            <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
+              <span className="text-[10px] font-mono uppercase text-neutral-500 block">Brand Color</span>
+              <div className="inline-flex items-center gap-1.5 text-xs font-mono font-bold mt-1" style={{ color: selectedPartner.accentColor }}>
+                <span className="w-3 h-3 rounded-full inline-block shadow-xs" style={{ backgroundColor: selectedPartner.accentColor }} />
+                {selectedPartner.accentColor}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (selectedCustomer) {
+      const parentPartner = partners.find(p => p.id === selectedCustomer.partnerId);
+      return (
+        <div className="bg-neutral-950 rounded-xl border border-emerald-500/50 p-5 space-y-4 relative overflow-hidden shadow-xl animate-in fade-in duration-150">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-850">
+            <div className="flex items-center gap-3">
+              {selectedCustomer.logoUrl ? (
+                <img 
+                  src={selectedCustomer.logoUrl} 
+                  alt={selectedCustomer.name} 
+                  className="w-12 h-12 rounded-xl object-cover bg-neutral-800 border border-neutral-700 shadow-md shrink-0" 
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLElement).style.display = 'none';
+                  }}
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-neutral-400 shrink-0">
+                  <Globe className="w-6 h-6 text-neutral-400" />
+                </div>
+              )}
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
+                    Active Selected Customer
+                  </span>
+                  <span className="text-xs text-neutral-500 font-mono">ID: {selectedCustomer.id}</span>
+                </div>
+                <h3 className="text-lg font-bold text-white mt-1">Active Customer: {selectedCustomer.name}</h3>
+                <p className="text-xs text-neutral-400 font-mono flex items-center gap-1.5 mt-0.5">
+                  <Globe className="w-3.5 h-3.5 text-neutral-500" />
+                  <span>
+                    Reseller: {parentPartner ? parentPartner.name : 'Direct Corporate Account (No Reseller)'}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setViewingCustomerDashboard(selectedCustomer)}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-emerald-900/30 cursor-pointer flex items-center gap-1.5"
+                title={`Open dashboard for customer ${selectedCustomer.name}`}
+              >
+                <FolderOpen className="w-3.5 h-3.5" />
+                <span>Open Dashboard</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsManagementPanelOpen(true)}
+                className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-lg text-xs font-semibold border border-neutral-700 transition-colors cursor-pointer flex items-center gap-1.5"
+                title={`Setup & Logo for ${selectedCustomer.name}`}
+              >
+                <span>Setup & Logo</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectCustomer(null)}
+                className="px-2.5 py-1.5 bg-red-950/60 hover:bg-red-900 text-red-300 hover:text-white rounded-lg text-xs font-semibold border border-red-800/60 transition-colors cursor-pointer flex items-center gap-1"
+                title="Unselect active customer"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Unselect Customer</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 pt-1">
+            <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
+              <span className="text-[10px] font-mono uppercase text-neutral-500 block">Parent Reseller</span>
+              <span className="text-base font-bold text-white font-mono mt-0.5 block truncate">
+                {parentPartner ? parentPartner.name : 'Direct Account'}
+              </span>
+            </div>
+            <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
+              <span className="text-[10px] font-mono uppercase text-neutral-500 block">Portal Admins</span>
+              <span className="text-base font-bold text-white font-mono mt-0.5 block">
+                {countAdmins(selectedCustomer.id, 'customer')} Admins
+              </span>
+            </div>
+            <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
+              <span className="text-[10px] font-mono uppercase text-neutral-500 block">Accent Color</span>
+              <div className="inline-flex items-center gap-1.5 text-xs font-mono font-bold mt-1" style={{ color: selectedCustomer.accentColor }}>
+                <span className="w-3 h-3 rounded-full inline-block shadow-xs" style={{ backgroundColor: selectedCustomer.accentColor }} />
+                {selectedCustomer.accentColor}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Neither partner nor customer is selected
+    return (
+      <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-6 text-center space-y-3">
+        <div className="w-12 h-12 rounded-xl bg-neutral-900 text-neutral-400 border border-neutral-800 flex items-center justify-center mx-auto">
+          <Building2 className="w-6 h-6" />
+        </div>
+        <div>
+          <h4 className="text-sm font-bold text-white">No Active Reseller or Customer Selected</h4>
+          <p className="text-xs text-neutral-400 mt-1 max-w-md mx-auto">
+            Hover over <strong>RESELLERS</strong> or <strong>TOTAL CUSTOMERS</strong> above to search and select, or click either card to view the full static directory.
+          </p>
+        </div>
+        <div className="flex items-center justify-center gap-2.5 pt-1">
+          <button
+            type="button"
+            onClick={() => setIsCorePartnersBoxOpen(true)}
+            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5"
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Open Resellers Directory</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsTotalCustomersBoxOpen(true)}
+            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5"
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>Open Customer Portals</span>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  if (viewingResellerDashboard) {
+    return (
+      <div className="space-y-6" id="super_admin_viewing_reseller">
+        <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-xl flex items-center justify-between shadow-md">
+          <button
+            type="button"
+            onClick={() => setViewingResellerDashboard(null)}
+            className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-xs font-bold flex items-center gap-2 border border-neutral-700 cursor-pointer transition-colors shadow-sm"
+          >
+            <ArrowLeft className="w-4 h-4 text-emerald-400" />
+            <span>← Back to Admin Dashboard</span>
+          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono text-emerald-400 bg-emerald-950 px-3 py-1.5 rounded-full border border-emerald-800 flex items-center gap-1.5 font-semibold">
+              <Building2 className="w-3.5 h-3.5" />
+              Viewing Reseller Dashboard: <strong className="text-white">{viewingResellerDashboard.name}</strong> (Super Admin Mode)
+            </span>
+          </div>
+        </div>
+
+        <PartnerDashboard
+          currentUser={{
+            ...currentUser,
+            role: 'PARTNER_ADMIN_GLOBAL',
+            partnerId: viewingResellerDashboard.id,
+            name: `${currentUser.name} (Viewing ${viewingResellerDashboard.name})`
+          }}
+          currentPartner={viewingResellerDashboard}
+          setPartners={setPartners}
+          customers={customers}
+          setCustomers={setCustomers}
+          users={users}
+          setUsers={setUsers}
+          setAuditLogs={setAuditLogs}
+          leads={leads}
+          setLeads={setLeads}
+          tasks={tasks}
+          setTasks={setTasks}
+          onSelectCustomer={(c) => setViewingCustomerDashboard(c)}
+          onNavigateOrgChart={onNavigateOrgChart}
+        />
+      </div>
+    );
+  }
+
+  if (viewingCustomerDashboard) {
+    const parentReseller = partners.find(p => p.id === viewingCustomerDashboard.partnerId) || null;
+    return (
+      <div className="space-y-6" id="super_admin_viewing_customer">
+        <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-xl flex items-center justify-between shadow-md">
+          <button
+            type="button"
+            onClick={() => setViewingCustomerDashboard(null)}
+            className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-xs font-bold flex items-center gap-2 border border-neutral-700 cursor-pointer transition-colors shadow-sm"
+          >
+            <ArrowLeft className="w-4 h-4 text-blue-400" />
+            <span>← Back to Admin Dashboard</span>
+          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono text-blue-400 bg-blue-950 px-3 py-1.5 rounded-full border border-blue-800 flex items-center gap-1.5 font-semibold">
+              <Globe className="w-3.5 h-3.5" />
+              Viewing Customer Dashboard: <strong className="text-white">{viewingCustomerDashboard.name}</strong> (Super Admin Mode)
+            </span>
+          </div>
+        </div>
+
+        <CustomerDashboard
+          currentUser={currentUser}
+          currentCustomer={viewingCustomerDashboard}
+          currentPartner={parentReseller}
+          leads={leads || []}
+          setLeads={setLeads || (() => {})}
+          tasks={tasks || []}
+          setTasks={setTasks || (() => {})}
+          users={users}
+          onBack={() => setViewingCustomerDashboard(null)}
+          onNavigateOrgChart={onNavigateOrgChart}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8" id="super_admin_view">
+      {/* Dedicated Management Panel Modal for Active Selected Partner or Customer */}
+      {renderManagementPanelModal()}
       
       {/* Title block */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-neutral-800 pb-5" id="sa_title_card">
@@ -377,7 +1810,7 @@ export default function SuperAdminDashboard({
 
       {/* Stats Bento Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4" id="sa_bento_grid">
-        {/* Bento Stat: CORE PARTNERS (Hover shows list with search & select, click toggles static on-page list) */}
+        {/* Bento Stat: RESELLERS (Hover shows list with search & select, click toggles static on-page list) */}
         <div 
           className="relative group bg-neutral-905 p-5 rounded-xl border border-neutral-800 hover:border-blue-500/60 transition-all flex flex-col justify-between cursor-pointer select-none" 
           id="bento_stat_partners"
@@ -391,10 +1824,10 @@ export default function SuperAdminDashboard({
                 setIsCorePartnersBoxOpen(prev => !prev);
               }}
               className="text-xs text-blue-400 hover:text-blue-300 font-mono font-bold tracking-wider uppercase flex items-center gap-1.5 text-left cursor-pointer"
-              title="Click to toggle static Core Partners list on page"
+              title="Click to toggle static Resellers directory on page"
             >
               <Building2 className="w-3.5 h-3.5 text-blue-400" />
-              <span>CORE PARTNERS</span>
+              <span>RESELLERS</span>
             </button>
             <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold">
               {partners.length}
@@ -412,14 +1845,14 @@ export default function SuperAdminDashboard({
             </h3>
             <p className="text-[10px] text-neutral-400 mt-1 flex items-center gap-1">
               <span className={`w-1.5 h-1.5 rounded-full ${selectedPartnerId ? 'bg-blue-400 animate-pulse' : 'bg-blue-500'}`} />
-              <span className="truncate">{selectedPartner ? `Active: ${selectedPartner.name}` : 'Isolated reseller groups'}</span>
+              <span className="truncate">{selectedPartner ? `Active: ${selectedPartner.name}` : 'Registered reseller organizations'}</span>
             </p>
             <div className="mt-2 text-[10px] text-blue-400/90 font-mono flex items-center gap-1">
               <span>{isCorePartnersBoxOpen ? '▼ Click to close box' : '▲ Click label to open box'}</span>
             </div>
           </div>
 
-          {/* Hover Floating List: Appears when hovering over CORE PARTNERS */}
+          {/* Hover Floating List: Appears when hovering over RESELLERS */}
           <div 
             className={`absolute top-full left-0 sm:left-0 mt-2 w-84 sm:w-96 bg-[#0c0d12] border border-blue-500/60 rounded-xl p-3.5 shadow-2xl z-50 transition-all duration-200 backdrop-blur-md before:content-[''] before:absolute before:-top-3 before:left-0 before:right-0 before:h-3 ${
               isHoverSearchFocused 
@@ -432,10 +1865,10 @@ export default function SuperAdminDashboard({
               <div className="flex items-center gap-1.5">
                 <Building2 className="w-3.5 h-3.5 text-blue-400" />
                 <span className="text-xs font-bold text-white uppercase font-mono">
-                  CORE PARTNERS ({filteredHoverPartners.length})
+                  RESELLERS ({filteredHoverPartners.length})
                 </span>
               </div>
-              <span className="text-[9px] text-neutral-400 font-mono">Hover & Select</span>
+              <span className="text-[9px] text-neutral-400 font-mono">Hover & Open</span>
             </div>
 
             {/* Search window at the top of hover list */}
@@ -447,7 +1880,7 @@ export default function SuperAdminDashboard({
                 onChange={(e) => setHoverPartnerSearch(e.target.value)}
                 onFocus={() => setIsHoverSearchFocused(true)}
                 onBlur={() => setIsHoverSearchFocused(false)}
-                placeholder="Search partners by name..."
+                placeholder="Search resellers by name..."
                 className="w-full bg-neutral-900 border border-neutral-700/80 rounded-lg pl-8 pr-7 py-1.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500 transition-colors"
                 onClick={(e) => e.stopPropagation()}
               />
@@ -515,11 +1948,22 @@ export default function SuperAdminDashboard({
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {isSelected ? (
-                          <span className="px-2 py-0.5 bg-blue-500 text-neutral-950 rounded text-[10px] font-bold flex items-center gap-1">
-                            <Check className="w-3 h-3" /> Selected
-                          </span>
-                        ) : (
                           <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectPartner(p); // toggles unselect!
+                            }}
+                            className="px-2 py-0.5 bg-blue-500 hover:bg-red-900 hover:text-white text-neutral-950 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors group/btn"
+                            title="Click to unselect"
+                          >
+                            <Check className="w-3 h-3 group-hover/btn:hidden" />
+                            <X className="w-3 h-3 hidden group-hover/btn:inline" />
+                            <span className="group-hover/btn:hidden">Selected</span>
+                            <span className="hidden group-hover/btn:inline">Unselect</span>
+                          </button>
+                        ) : (
+                            <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -527,7 +1971,7 @@ export default function SuperAdminDashboard({
                             }}
                             className="px-2 py-0.5 bg-neutral-800 hover:bg-blue-600 hover:text-white text-neutral-300 rounded text-[10px] font-medium border border-neutral-700 hover:border-blue-500 transition-colors cursor-pointer"
                           >
-                            Select
+                            Open Dashboard
                           </button>
                         )}
                       </div>
@@ -693,9 +2137,20 @@ export default function SuperAdminDashboard({
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {isSelected ? (
-                          <span className="px-2 py-0.5 bg-emerald-500 text-neutral-950 rounded text-[10px] font-bold flex items-center gap-1">
-                            <Check className="w-3 h-3" /> Selected
-                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectCustomer(c); // toggles unselect!
+                            }}
+                            className="px-2 py-0.5 bg-emerald-500 hover:bg-red-900 hover:text-white text-neutral-950 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors group/btn"
+                            title="Click to unselect"
+                          >
+                            <Check className="w-3 h-3 group-hover/btn:hidden" />
+                            <X className="w-3 h-3 hidden group-hover/btn:inline" />
+                            <span className="group-hover/btn:hidden">Selected</span>
+                            <span className="hidden group-hover/btn:inline">Unselect</span>
+                          </button>
                         ) : (
                           <button
                             type="button"
@@ -705,7 +2160,7 @@ export default function SuperAdminDashboard({
                             }}
                             className="px-2 py-0.5 bg-neutral-800 hover:bg-emerald-600 hover:text-white text-neutral-300 rounded text-[10px] font-medium border border-neutral-700 hover:border-emerald-500 transition-colors cursor-pointer"
                           >
-                            Select
+                            Open Dashboard
                           </button>
                         )}
                       </div>
@@ -901,7 +2356,7 @@ export default function SuperAdminDashboard({
                   <Building2 className="w-4 h-4" />
                 </span>
                 <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-                  CORE PARTNERS DIRECTORY
+                  RESELLERS DIRECTORY
                   <span className="text-xs font-mono font-normal px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
                     {filteredStaticPartners.length} of {partners.length} Resellers
                   </span>
@@ -913,7 +2368,7 @@ export default function SuperAdminDashboard({
                 </h2>
               </div>
               <p className="text-xs text-neutral-400 mt-1">
-                Static list of registered reselling partners. Search by any part of the name to compress the roster. Click any partner to select.
+                Static directory of registered resellers. Click any reseller or Open Dashboard to launch their portal.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1067,21 +2522,24 @@ export default function SuperAdminDashboard({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleSelectPartner(isSelected ? null : p);
+                              handleSelectPartner(p); // toggles unselect!
                             }}
                             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
                               isSelected
-                                ? 'bg-blue-500 hover:bg-blue-400 text-neutral-950 font-bold shadow-xs'
+                                ? 'bg-blue-500 hover:bg-red-900 hover:text-white text-neutral-950 font-bold shadow-xs group/btn'
                                 : 'bg-neutral-800 hover:bg-blue-600 hover:text-white text-neutral-200 border border-neutral-700'
                             }`}
+                            title={isSelected ? 'Click to unselect partner' : 'Select partner'}
                           >
                             {isSelected ? (
                               <>
-                                <Check className="w-3.5 h-3.5" />
-                                <span>Selected</span>
+                                <Check className="w-3.5 h-3.5 group-hover/btn:hidden" />
+                                <X className="w-3.5 h-3.5 hidden group-hover/btn:inline" />
+                                <span className="group-hover/btn:hidden">Selected</span>
+                                <span className="hidden group-hover/btn:inline">Unselect</span>
                               </>
                             ) : (
-                              <span>Select</span>
+                              <span>Open Dashboard</span>
                             )}
                           </button>
                         </td>
@@ -1283,7 +2741,7 @@ export default function SuperAdminDashboard({
                                 <span>Selected</span>
                               </>
                             ) : (
-                              <span>Select</span>
+                              <span>Open Dashboard</span>
                             )}
                           </button>
                         </td>
@@ -1461,93 +2919,7 @@ export default function SuperAdminDashboard({
       {activeTab === 'partners' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" id="sa_tab_partners">
           <div className="lg:col-span-2 space-y-4">
-            {/* Active Selected Partner Profile or Directory Guidance */}
-            {selectedPartner ? (
-              <div className="bg-neutral-950 rounded-xl border border-blue-500/50 p-5 space-y-4 relative overflow-hidden shadow-xl">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-850">
-                  <div className="flex items-center gap-3">
-                    <img 
-                      src={selectedPartner.logoUrl} 
-                      alt={selectedPartner.name} 
-                      className="w-12 h-12 rounded-xl object-cover bg-neutral-800 border border-neutral-700 shadow-md shrink-0" 
-                      referrerPolicy="no-referrer"
-                    />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/40 font-bold">
-                          Active Selected Partner
-                        </span>
-                        <span className="text-xs text-neutral-500 font-mono">ID: {selectedPartner.id}</span>
-                      </div>
-                      <h3 className="text-lg font-bold text-white mt-1">{selectedPartner.name}</h3>
-                      <p className="text-xs text-neutral-400 font-mono flex items-center gap-1.5 mt-0.5">
-                        <Globe className="w-3.5 h-3.5 text-neutral-500" />
-                        <span>{selectedPartner.domain || 'no domain configured'}</span>
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsCorePartnersBoxOpen(true)}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
-                    >
-                      <Building2 className="w-3.5 h-3.5" />
-                      <span>Open Directory</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSelectPartner(null)}
-                      className="px-2.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded-lg text-xs font-mono border border-neutral-800 transition-colors cursor-pointer"
-                    >
-                      Deselect
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 pt-1">
-                  <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
-                    <span className="text-[10px] font-mono uppercase text-neutral-500 block">Customer Portals</span>
-                    <span className="text-base font-bold text-white font-mono mt-0.5 block">
-                      {countCustomers(selectedPartner.id)} Sub-tenants
-                    </span>
-                  </div>
-                  <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
-                    <span className="text-[10px] font-mono uppercase text-neutral-500 block">Delegated Admins</span>
-                    <span className="text-base font-bold text-white font-mono mt-0.5 block">
-                      {countAdmins(selectedPartner.id, 'partner')} Accounts
-                    </span>
-                  </div>
-                  <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
-                    <span className="text-[10px] font-mono uppercase text-neutral-500 block">Brand Color</span>
-                    <div className="inline-flex items-center gap-1.5 text-xs font-mono font-bold mt-1" style={{ color: selectedPartner.accentColor }}>
-                      <span className="w-3 h-3 rounded-full inline-block shadow-xs" style={{ backgroundColor: selectedPartner.accentColor }} />
-                      {selectedPartner.accentColor}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-6 text-center space-y-3">
-                <div className="w-12 h-12 rounded-xl bg-blue-950/40 text-blue-400 border border-blue-800/40 flex items-center justify-center mx-auto">
-                  <Building2 className="w-6 h-6" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-white">Core Partners Directory</h4>
-                  <p className="text-xs text-neutral-400 mt-1 max-w-md mx-auto">
-                    The list of Registered Reselling Partners is managed via the <strong>CORE PARTNERS</strong> card above. Hover over the card to quickly search and select a partner, or click it to view the full static directory.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsCorePartnersBoxOpen(true)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-2"
-                >
-                  <Building2 className="w-3.5 h-3.5" />
-                  <span>Open Core Partners Directory</span>
-                </button>
-              </div>
-            )}
+            {renderActiveSelectionCard()}
           </div>
 
           {/* Quick Creator */}
@@ -1630,98 +3002,7 @@ export default function SuperAdminDashboard({
       {activeTab === 'customers' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" id="sa_tab_customers">
           <div className="lg:col-span-2 space-y-4">
-            {/* Active Selected Customer Profile or Directory Guidance */}
-            {selectedCustomer ? (
-              <div className="bg-neutral-950 rounded-xl border border-emerald-500/50 p-5 space-y-4 relative overflow-hidden shadow-xl">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-850">
-                  <div className="flex items-center gap-3">
-                    <img 
-                      src={selectedCustomer.logoUrl} 
-                      alt={selectedCustomer.name} 
-                      className="w-12 h-12 rounded-xl object-cover bg-neutral-800 border border-neutral-700 shadow-md shrink-0" 
-                      referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLElement).style.display = 'none';
-                      }}
-                    />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
-                          Active Selected Customer
-                        </span>
-                        <span className="text-xs text-neutral-500 font-mono">ID: {selectedCustomer.id}</span>
-                      </div>
-                      <h3 className="text-lg font-bold text-white mt-1">{selectedCustomer.name}</h3>
-                      <p className="text-xs text-neutral-400 font-mono flex items-center gap-1.5 mt-0.5">
-                        <Globe className="w-3.5 h-3.5 text-neutral-500" />
-                        <span>
-                          Owner: {partners.find(p => p.id === selectedCustomer.partnerId)?.name || 'Direct Retail Account'}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsTotalCustomersBoxOpen(true)}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
-                    >
-                      <Globe className="w-3.5 h-3.5" />
-                      <span>Open Directory</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSelectCustomer(null)}
-                      className="px-2.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded-lg text-xs font-mono border border-neutral-800 transition-colors cursor-pointer"
-                    >
-                      Deselect
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 pt-1">
-                  <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
-                    <span className="text-[10px] font-mono uppercase text-neutral-500 block">Parent Reseller</span>
-                    <span className="text-base font-bold text-white font-mono mt-0.5 block truncate">
-                      {partners.find(p => p.id === selectedCustomer.partnerId)?.name || 'Direct'}
-                    </span>
-                  </div>
-                  <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
-                    <span className="text-[10px] font-mono uppercase text-neutral-500 block">Portal Admins</span>
-                    <span className="text-base font-bold text-white font-mono mt-0.5 block">
-                      {countAdmins(selectedCustomer.id, 'customer')} Admins
-                    </span>
-                  </div>
-                  <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850">
-                    <span className="text-[10px] font-mono uppercase text-neutral-500 block">Accent Color</span>
-                    <div className="inline-flex items-center gap-1.5 text-xs font-mono font-bold mt-1" style={{ color: selectedCustomer.accentColor }}>
-                      <span className="w-3 h-3 rounded-full inline-block shadow-xs" style={{ backgroundColor: selectedCustomer.accentColor }} />
-                      {selectedCustomer.accentColor}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-6 text-center space-y-3">
-                <div className="w-12 h-12 rounded-xl bg-emerald-950/40 text-emerald-400 border border-emerald-800/40 flex items-center justify-center mx-auto">
-                  <Globe className="w-6 h-6" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-white">Customer Portals Directory</h4>
-                  <p className="text-xs text-neutral-400 mt-1 max-w-md mx-auto">
-                    The list of Customer Organizations is managed via the <strong>TOTAL CUSTOMERS</strong> card above. Hover over the card to quickly search and select a customer, or click it to view the full static directory.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsTotalCustomersBoxOpen(true)}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-2"
-                >
-                  <Globe className="w-3.5 h-3.5" />
-                  <span>Open Customer Portals Directory</span>
-                </button>
-              </div>
-            )}
+            {renderActiveSelectionCard()}
           </div>
 
           {/* Quick Creator */}

@@ -1,4 +1,4 @@
-export type UserRole = 'SUPER_ADMIN' | 'PARTNER_ADMIN' | 'CUSTOMER_ADMIN';
+export type UserRole = 'SUPER_ADMIN' | 'PARTNER_ADMIN' | 'PARTNER_ADMIN_GLOBAL' | 'CUSTOMER_ADMIN';
 
 export interface Partner {
   id: string;
@@ -25,6 +25,7 @@ export interface PortalUser {
   role: UserRole;
   partnerId: string | null; // Set if role is PARTNER_ADMIN
   customerId: string | null; // Set if role is CUSTOMER_ADMIN
+  assignedCustomerIds?: string[]; // Array of customer/sub-account IDs this administrator has access to
   avatarUrl?: string;
   isActive: boolean;
   createdAt: string;
