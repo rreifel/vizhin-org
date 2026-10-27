@@ -394,22 +394,20 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
     XLSX.writeFile(wb, 'company_hierarchy_template.xlsx');
   };
 
-  // "Test upload" handler: builds and reveals org chart in box
+  // "Test upload" handler: builds and reveals org chart based on identified uploaded file
   const handleTestUpload = () => {
     setUploadError(null);
+    if (!isFileUploaded || employeeData.length === 0) {
+      setUploadError('Please select and upload your completed Excel template (.xlsx) first by clicking "Upload Completed Template" or selecting a file.');
+      return;
+    }
     try {
-      const recordsToUse = employeeData.length > 0 
-        ? employeeData 
-        : parseRowsToRecords(TEMPLATE_HEADERS, SAMPLE_EMPLOYEES_DATA);
-      if (employeeData.length === 0) {
-        setEmployeeData(recordsToUse);
-      }
-      const tree = buildTree(recordsToUse);
+      const tree = buildTree(employeeData);
       setOrgChartTree(tree);
       setIsOrgChartTested(true);
       setIsOrgChartAccepted(false);
     } catch (err: any) {
-      setUploadError(`Failed to generate org chart: ${err.message}`);
+      setUploadError(`Failed to generate org chart from ${uploadedFileName}: ${err.message}`);
     }
   };
 
@@ -501,27 +499,47 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
           )}
         </div>
 
-        {/* Tree Branch Connectors */}
+        {/* Tree Branch Connectors - Crisp child-centered line geometry */}
         {hasChildren && !isCollapsed && (
           <div className="flex flex-col items-center w-full">
-            <div className="w-0.5 h-6 bg-neutral-400"></div>
+            {/* Vertical stem down from parent */}
+            <div className="w-[2px] h-6 bg-neutral-600"></div>
 
-            {node.children.length > 1 && (
-              <div 
-                className="h-0.5 bg-neutral-400"
-                style={{
-                  width: `calc(100% - ${256 / node.children.length}px)`
-                }}
-              ></div>
-            )}
+            {/* Horizontal bar across children */}
+            <div className="flex justify-center relative">
+              {node.children.map((child, index) => {
+                const isOnly = node.children.length === 1;
+                const isFirst = index === 0;
+                const isLast = index === node.children.length - 1;
 
-            <div className="flex items-start justify-center gap-6 pt-2">
-              {node.children.map((child) => (
-                <div key={child.employee_id} className="flex flex-col items-center">
-                  <div className="w-0.5 h-4 bg-neutral-400 -mt-2 mb-2"></div>
-                  {renderOrgNode(child)}
-                </div>
-              ))}
+                return (
+                  <div key={child.employee_id} className="flex flex-col items-center px-4 relative">
+                    {/* Horizontal connecting line segments terminating exactly at the child midpoint */}
+                    {!isOnly && (
+                      <>
+                        {/* Left half segment */}
+                        <div
+                          className={`absolute top-0 left-0 right-1/2 h-[2px] ${
+                            isFirst ? 'bg-transparent' : 'bg-neutral-600'
+                          }`}
+                        />
+                        {/* Right half segment */}
+                        <div
+                          className={`absolute top-0 left-1/2 right-0 h-[2px] ${
+                            isLast ? 'bg-transparent' : 'bg-neutral-600'
+                          }`}
+                        />
+                      </>
+                    )}
+
+                    {/* Vertical stem down into child node card */}
+                    <div className="w-[2px] h-6 bg-neutral-600"></div>
+
+                    {/* Recursive child branch */}
+                    {renderOrgNode(child)}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -883,11 +901,11 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={handleLoadSampleData}
-                    className="px-3 py-1.5 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 text-xs font-semibold rounded-lg border border-emerald-800 transition-colors cursor-pointer flex items-center gap-1.5"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
                   >
-                    <RefreshCw className="w-3 h-3" />
-                    <span>Load 8-Person Sample Data</span>
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload Completed Template</span>
                   </button>
                 </div>
               </div>
@@ -952,7 +970,7 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
                 }}
                 className={`p-6 rounded-xl border-2 border-dashed transition-all cursor-pointer text-center ${
                   isFileUploaded 
-                    ? 'border-emerald-500/70 bg-emerald-950/20' 
+                    ? 'border-emerald-500/80 bg-emerald-950/25 ring-1 ring-emerald-500/40' 
                     : 'border-neutral-700 hover:border-emerald-500/50 bg-neutral-950'
                 }`}
               >
@@ -968,34 +986,61 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
                   className="hidden"
                 />
 
-                <div className="flex flex-col items-center justify-center space-y-2">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    isFileUploaded ? 'bg-emerald-500/20 text-emerald-400' : 'bg-neutral-800 text-neutral-400'
+                <div className="flex flex-col items-center justify-center space-y-2.5">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+                    isFileUploaded ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-neutral-800 text-neutral-400'
                   }`}>
-                    {isFileUploaded ? <Check className="w-5 h-5" /> : <Upload className="w-5 h-5" />}
+                    {isFileUploaded ? <CheckCircle2 className="w-6 h-6" /> : <Upload className="w-6 h-6" />}
                   </div>
 
-                  <div>
-                    {isFileUploaded ? (
-                      <div className="space-y-0.5">
-                        <span className="text-xs font-bold text-white block">
-                          File Loaded: {uploadedFileName}
-                        </span>
-                        <span className="text-[11px] text-emerald-400 font-mono">
-                          {employeeData.length > 0 ? `${employeeData.length} Employee Records Verified` : 'Sample Employee Data Ready'}
-                        </span>
+                  {isFileUploaded ? (
+                    <div className="space-y-2 text-center">
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-950/80 border border-emerald-500/60 text-xs">
+                        <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span className="text-neutral-300">Identified File:</span>
+                        <strong className="text-white font-mono">{uploadedFileName}</strong>
                       </div>
-                    ) : (
-                      <div>
-                        <span className="text-xs font-bold text-white block">
-                          Drag & drop employee Excel (.xlsx) file here, or click to browse
-                        </span>
-                        <span className="text-[11px] text-neutral-500 font-mono">
-                          Supports Microsoft Excel (.xlsx) templates with colored header structure
-                        </span>
+                      <p className="text-[11px] text-emerald-400 font-mono">
+                        ✓ {employeeData.length} Employee records parsed from completed template · Ready to Test
+                      </p>
+                      <div className="flex items-center justify-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            fileInputRef.current?.click();
+                          }}
+                          className="px-3 py-1 text-[11px] bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-md border border-neutral-700 transition-colors font-medium cursor-pointer"
+                        >
+                          Change File
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setUploadedFileName('');
+                            setEmployeeData([]);
+                            setIsFileUploaded(false);
+                            setOrgChartTree(null);
+                            setIsOrgChartTested(false);
+                            setIsOrgChartAccepted(false);
+                          }}
+                          className="px-3 py-1 text-[11px] bg-red-950/60 hover:bg-red-900 text-red-300 rounded-md border border-red-800/60 transition-colors font-medium cursor-pointer"
+                        >
+                          Remove File
+                        </button>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="text-center space-y-1">
+                      <span className="text-xs font-bold text-white block">
+                        Drag & drop your completed Excel (.xlsx) file here, or click to browse
+                      </span>
+                      <span className="text-[11px] text-neutral-400 font-mono block">
+                        Select the completed template file from your computer
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1007,17 +1052,19 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
               )}
 
               {/* 4. "Test upload" Button Trigger */}
-              <div className="flex items-center justify-between pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
                 <span className="text-[11px] text-neutral-400 font-mono">
-                  Ready to preview hierarchy and validate manager-employee linkages:
+                  {isFileUploaded 
+                    ? `Ready to generate org chart for "${uploadedFileName}" (${employeeData.length} records):`
+                    : 'Select or drag your completed template file above to generate the org chart preview:'}
                 </span>
                 <button
                   type="button"
                   onClick={handleTestUpload}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-emerald-950/50 cursor-pointer flex items-center gap-2"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-emerald-950/50 cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Test upload</span>
+                  <span>Test Upload</span>
                 </button>
               </div>
             </div>
