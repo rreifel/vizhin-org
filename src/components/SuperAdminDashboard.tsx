@@ -3,6 +3,7 @@ import { Partner, Customer, PortalUser, AuditLog, WorkspaceRequest, Lead, Task }
 import { FALLBACK_GREYED_REQUESTS } from '../mockData';
 import PartnerDashboard from './PartnerDashboard';
 import CustomerDashboard from './CustomerDashboard';
+import { CustomerOnboardingFlow } from './CustomerOnboardingFlow';
 import { 
   Building2, Users, Key, Plus, Trash2, ArrowRight, CheckCircle2, 
   HelpCircle, Eye, Shield, Globe, Sparkles, Activity, FileCheck, Check,
@@ -75,6 +76,7 @@ export default function SuperAdminDashboard({
   const [viewingCustomerDashboard, setViewingCustomerDashboard] = useState<Customer | null>(null);
 
   const [isAddComingSoonOpen, setIsAddComingSoonOpen] = useState(false);
+  const [isOnboardingCustomerOpen, setIsOnboardingCustomerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'admins' | 'audit'>('admins');
   const [showVizhinAddAdminModal, setShowVizhinAddAdminModal] = useState(false);
   const [vizhinFirstName, setVizhinFirstName] = useState('');
@@ -1792,6 +1794,32 @@ export default function SuperAdminDashboard({
     );
   }
 
+  if (isOnboardingCustomerOpen) {
+    return (
+      <CustomerOnboardingFlow
+        currentUser={currentUser}
+        partners={partners}
+        customers={customers}
+        onComplete={(newCustomer, newAdmin, employeeCount) => {
+          setCustomers(prev => [newCustomer, ...prev]);
+          setUsers(prev => [newAdmin, ...prev]);
+          addAudit(
+            'CUSTOMER_PORTAL_ONBOARDED',
+            `Customer portal "${newCustomer.name}" provisioned with ${employeeCount} employees via CSV onboarding. Customer Admin ${newAdmin.name} (${newAdmin.email}) established.`,
+            'info'
+          );
+          setIsOnboardingCustomerOpen(false);
+          setIsAddComingSoonOpen(false);
+          setSelectedCustomerId(newCustomer.id);
+          setCustomerActionNotice(`Successfully provisioned customer portal: ${newCustomer.name}`);
+        }}
+        onBack={() => {
+          setIsOnboardingCustomerOpen(false);
+        }}
+      />
+    );
+  }
+
   if (isAddComingSoonOpen) {
     return (
       <div className="space-y-6" id="super_admin_add_coming_soon">
@@ -1818,32 +1846,46 @@ export default function SuperAdminDashboard({
           </div>
 
           <span className="inline-block px-3 py-1 rounded-full text-[11px] font-mono font-semibold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 mb-3">
-            Coming Soon
+            Onboarding Hub
           </span>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-3">
             Add New Customers and Partners
           </h1>
           <p className="text-neutral-400 text-sm sm:text-base max-w-xl mx-auto leading-relaxed mb-8">
-            Self-service onboarding and automated workspace provisioning for new reselling partners and customer sub-accounts are currently under development.
+            Select a tenant entity type below to initiate workspace provisioning, configure branding credentials, and establish administrator delegation.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left max-w-xl mx-auto mb-8">
-            <div className="p-4 bg-neutral-900/60 border border-neutral-800 rounded-xl space-y-1.5">
-              <div className="flex items-center gap-2 text-white font-semibold text-xs">
-                <Building2 className="w-4 h-4 text-blue-400" />
-                <span>New Reseller Partner</span>
+            <div className="p-5 bg-neutral-900/40 border border-neutral-800/80 rounded-xl space-y-1.5 opacity-75">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-white font-semibold text-xs">
+                  <Building2 className="w-4 h-4 text-blue-400" />
+                  <span>New Reseller Partner</span>
+                </div>
+                <span className="text-[10px] font-mono text-neutral-500 bg-neutral-800 px-1.5 py-0.5 rounded border border-neutral-700">
+                  Coming Soon
+                </span>
               </div>
-              <p className="text-neutral-500 text-[11px]">
+              <p className="text-neutral-500 text-[11px] leading-relaxed">
                 Create independent reseller tenants, assign custom domains, configure branding, and establish root administrators.
               </p>
             </div>
-            <div className="p-4 bg-neutral-900/60 border border-neutral-800 rounded-xl space-y-1.5">
-              <div className="flex items-center gap-2 text-white font-semibold text-xs">
-                <Globe className="w-4 h-4 text-emerald-400" />
-                <span>New Customer Portal</span>
+
+            <div 
+              onClick={() => setIsOnboardingCustomerOpen(true)}
+              className="p-5 bg-neutral-900/90 hover:bg-neutral-850 border-2 border-emerald-500/70 hover:border-emerald-400 rounded-xl space-y-2 cursor-pointer transition-all shadow-xl hover:shadow-emerald-950/50 group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-white font-bold text-xs">
+                  <Globe className="w-4 h-4 text-emerald-400" />
+                  <span>New Customer Portal</span>
+                </div>
+                <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-700 font-semibold group-hover:bg-emerald-500 group-hover:text-neutral-950 transition-colors">
+                  Onboard Now →
+                </span>
               </div>
-              <p className="text-neutral-500 text-[11px]">
-                Deploy isolated customer portals, delegate partner oversight, and import employee directories with automated SSO.
+              <p className="text-neutral-300 text-[11px] leading-relaxed">
+                Deploy isolated customer portals, upload company logo, set up Customer Admins, and verify CSV employee hierarchy.
               </p>
             </div>
           </div>
