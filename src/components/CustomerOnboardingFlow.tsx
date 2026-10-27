@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { 
   ArrowLeft, 
   Upload, 
@@ -15,14 +16,34 @@ import {
   AlertCircle, 
   ChevronDown, 
   ChevronRight, 
-  RefreshCw,
-  Image as ImageIcon,
-  Trash2
+  RefreshCw, 
+  Image as ImageIcon, 
+  Trash2 
 } from 'lucide-react';
 import { Partner, Customer, PortalUser } from '../types';
-import { HR_SYSTEMS_LIST } from './SuperAdminDashboard';
 
-// Employee record interface conforming to the CSV specification
+// The certified list of HRIS vendors provided by the user
+export const CERTIFIED_HRIS_VENDORS = [
+  'ADP Workforce Now',
+  'BambooHR',
+  'Gusto',
+  'HiBob',
+  'Insperity',
+  'Oracle Fusion Cloud HCM',
+  'Paychex Flex',
+  'Paycom',
+  'Paylocity',
+  'Paycor',
+  'Personio',
+  'Rippling',
+  'SAP SuccessFactors HXM',
+  'TriNet',
+  'UKG Pro / UKG Ready',
+  'Workday HCM',
+  'Zoho People',
+] as const;
+
+// Employee record interface conforming to the 14-column specification
 export interface CsvEmployeeRecord {
   employee_id: string; // Required (red)
   first_name: string; // Required (red)
@@ -53,16 +74,33 @@ interface CustomerOnboardingFlowProps {
   onBack: () => void;
 }
 
-// Sample CSV data matching the exact columns and hierarchy
-const SAMPLE_CSV_CONTENT = `employee_id,first_name,last_name,work_email,manager_employee_id,manager_email,job_title,department,preferred_name,location,employment_status,hire_date,employee_type,cost_center
-EMP-001,Eleanor,Vance,e.vance@company.com,,,Chief Executive Officer,Executive,Eleanor,"New York, NY",Active,2019-03-15,Full-Time,CC-100
-EMP-002,Marcus,Brody,m.brody@company.com,EMP-001,,VP of Engineering,Engineering,Marcus,"Austin, TX",Active,2020-06-01,Full-Time,CC-101
-EMP-003,Sarah,Connor,s.connor@company.com,EMP-001,,VP of Sales & Marketing,Revenue,Sarah,"San Francisco, CA",Active,2020-08-15,Full-Time,CC-102
-EMP-004,David,Chen,d.chen@company.com,EMP-002,,Engineering Director,Engineering,Dave,"Seattle, WA",Active,2021-01-10,Full-Time,CC-101
-EMP-005,Aisha,Patel,a.patel@company.com,EMP-002,,Principal Architect,Engineering,Aisha,"Austin, TX",Active,2021-04-20,Full-Time,CC-101
-EMP-006,James,Wilson,j.wilson@company.com,EMP-003,,Enterprise Account Executive,Revenue,Jim,"Chicago, IL",Active,2021-09-01,Full-Time,CC-102
-EMP-007,Elena,Rostova,e.rostova@company.com,EMP-004,,Senior Frontend Engineer,Engineering,Elena,"New York, NY",Active,2022-02-14,Full-Time,CC-101
-EMP-008,Thomas,Wright,t.wright@company.com,EMP-004,,Senior Backend Engineer,Engineering,Tom,"Remote",Active,2022-05-01,Full-Time,CC-101`;
+const TEMPLATE_HEADERS = [
+  'employee_id',
+  'first_name',
+  'last_name',
+  'work_email',
+  'manager_employee_id',
+  'manager_email',
+  'job_title',
+  'department',
+  'preferred_name',
+  'location',
+  'employment_status',
+  'hire_date',
+  'employee_type',
+  'cost_center',
+];
+
+const SAMPLE_EMPLOYEES_DATA = [
+  ['EMP-001', 'Eleanor', 'Vance', 'e.vance@company.com', '', '', 'Chief Executive Officer', 'Executive', 'Eleanor', 'New York, NY', 'Active', '2019-03-15', 'Full-Time', 'CC-100'],
+  ['EMP-002', 'Marcus', 'Brody', 'm.brody@company.com', 'EMP-001', '', 'VP of Engineering', 'Engineering', 'Marcus', 'Austin, TX', 'Active', '2020-06-01', 'Full-Time', 'CC-101'],
+  ['EMP-003', 'Sarah', 'Connor', 's.connor@company.com', 'EMP-001', '', 'VP of Sales & Marketing', 'Revenue', 'Sarah', 'San Francisco, CA', 'Active', '2020-08-15', 'Full-Time', 'CC-102'],
+  ['EMP-004', 'David', 'Chen', 'd.chen@company.com', 'EMP-002', '', 'Engineering Director', 'Engineering', 'Dave', 'Seattle, WA', 'Active', '2021-01-10', 'Full-Time', 'CC-101'],
+  ['EMP-005', 'Aisha', 'Patel', 'a.patel@company.com', 'EMP-002', '', 'Principal Architect', 'Engineering', 'Aisha', 'Austin, TX', 'Active', '2021-04-20', 'Full-Time', 'CC-101'],
+  ['EMP-006', 'James', 'Wilson', 'j.wilson@company.com', 'EMP-003', '', 'Enterprise Account Executive', 'Revenue', 'Jim', 'Chicago, IL', 'Active', '2021-09-01', 'Full-Time', 'CC-102'],
+  ['EMP-007', 'Elena', 'Rostova', 'e.rostova@company.com', 'EMP-004', '', 'Senior Frontend Engineer', 'Engineering', 'Elena', 'New York, NY', 'Active', '2022-02-14', 'Full-Time', 'CC-101'],
+  ['EMP-008', 'Thomas', 'Wright', 't.wright@company.com', 'EMP-004', '', 'Senior Backend Engineer', 'Engineering', 'Tom', 'Remote', 'Active', '2022-05-01', 'Full-Time', 'CC-101']
+];
 
 export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
   currentUser,
@@ -78,21 +116,21 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
   const [logoPreview, setLogoPreview] = useState<string>('');
   const logoInputRef = useRef<HTMLInputElement>(null);
 
-  // Onboarding Method Dropdown: Option 1 (CSV), Option 2 (HRIS Manual), Option 3 (HRIS Integration)
-  const [onboardingOption, setOnboardingOption] = useState<'csv' | 'hris_manual' | 'hris_integration'>('csv');
+  // Onboarding Method Dropdown: Option 1 (Excel .xlsx), Option 2 (HRIS Manual), Option 3 (HRIS Integration)
+  const [onboardingOption, setOnboardingOption] = useState<'excel' | 'hris_manual' | 'hris_integration'>('excel');
   const [selectedHris, setSelectedHris] = useState<string>('ADP Workforce Now');
 
-  // Customer Admin Setup (Fields directly above CSV upload zone)
+  // Customer Admin Setup (Fields directly above file upload zone)
   const [adminFirstName, setAdminFirstName] = useState('');
   const [adminLastName, setAdminLastName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
 
-  // CSV State
-  const [csvFileName, setCsvFileName] = useState<string>('');
-  const [csvData, setCsvData] = useState<CsvEmployeeRecord[]>([]);
-  const [csvError, setCsvError] = useState<string | null>(null);
-  const [isCsvUploaded, setIsCsvUploaded] = useState<boolean>(false);
-  const csvFileInputRef = useRef<HTMLInputElement>(null);
+  // Spreadsheet File State
+  const [uploadedFileName, setUploadedFileName] = useState<string>('');
+  const [employeeData, setEmployeeData] = useState<CsvEmployeeRecord[]>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isFileUploaded, setIsFileUploaded] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Info Modal state
   const [isInfoModalOpen, setIsInfoModalOpen] = useState<boolean>(false);
@@ -107,52 +145,27 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [provisionSuccess, setProvisionSuccess] = useState<string | null>(null);
 
-  // Helper to parse CSV string into records
-  const parseCsvText = (text: string): CsvEmployeeRecord[] => {
-    const lines = text
-      .split(/\r?\n/)
-      .map(l => l.trim())
-      .filter(l => l.length > 0);
-    if (lines.length < 2) {
-      throw new Error('CSV must contain a header row and at least one employee data row.');
-    }
-
-    const parseLine = (line: string): string[] => {
-      const result: string[] = [];
-      let current = '';
-      let inQuotes = false;
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        if (char === '"') {
-          inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-          result.push(current.trim());
-          current = '';
-        } else {
-          current += char;
-        }
-      }
-      result.push(current.trim());
-      return result;
-    };
-
-    const headers = parseLine(lines[0]).map(h => h.toLowerCase().replace(/[\s-]/g, '_'));
+  // Helper to parse rows of arrays into CsvEmployeeRecord objects
+  const parseRowsToRecords = (headers: string[], rows: any[][]): CsvEmployeeRecord[] => {
+    const normalizedHeaders = headers.map(h => String(h || '').trim().toLowerCase().replace(/[\s-]/g, '_'));
     const requiredHeaders = ['employee_id', 'first_name', 'last_name', 'work_email', 'manager_employee_id'];
-    const missingRequired = requiredHeaders.filter(rh => !headers.includes(rh));
+    const missingRequired = requiredHeaders.filter(rh => !normalizedHeaders.includes(rh));
 
     if (missingRequired.length > 0) {
-      throw new Error(`CSV is missing required headers: ${missingRequired.join(', ')}`);
+      throw new Error(`Template is missing required headers: ${missingRequired.join(', ')}`);
     }
 
     const records: CsvEmployeeRecord[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const values = parseLine(lines[i]);
-      if (values.every(v => v === '')) continue;
+    for (const row of rows) {
+      if (!row || row.every(val => val === '' || val === undefined || val === null)) continue;
 
       const record: any = {};
-      headers.forEach((h, idx) => {
-        record[h] = values[idx] || '';
+      normalizedHeaders.forEach((h, idx) => {
+        const val = row[idx];
+        record[h] = val !== undefined && val !== null ? String(val).trim() : '';
       });
+
+      if (!record.employee_id && !record.first_name) continue;
 
       // Default employment_status to Active if absent
       if (!record.employment_status || record.employment_status.trim() === '') {
@@ -163,7 +176,7 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
     }
 
     if (records.length === 0) {
-      throw new Error('No employee records found in CSV.');
+      throw new Error('No employee records found in Excel/CSV file.');
     }
 
     return records;
@@ -244,7 +257,7 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
     return rootNode;
   };
 
-  // Handle Logo Upload (isolated)
+  // Handle Logo Upload (completely separate)
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -266,67 +279,137 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
     { label: 'Solar Amber', url: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=160&h=160&fit=crop' },
   ];
 
-  // Handle CSV File Selection
-  const handleCsvFile = (file: File) => {
-    setCsvError(null);
-    setCsvFileName(file.name);
+  // Handle Excel / CSV File Selection
+  const handleSpreadsheetFile = (file: File) => {
+    setUploadError(null);
+    setUploadedFileName(file.name);
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+
     const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result as string;
-        const records = parseCsvText(text);
-        setCsvData(records);
-        setIsCsvUploaded(true);
-        setIsOrgChartTested(false);
-        setIsOrgChartAccepted(false);
-        setOrgChartTree(null);
-      } catch (err: any) {
-        setCsvError(err.message || 'Failed to parse CSV file.');
-        setIsCsvUploaded(false);
-      }
-    };
-    reader.readAsText(file);
+    if (isExcel) {
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const rawRows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          if (!rawRows || rawRows.length < 2) {
+            throw new Error('Excel file must contain a header row and data rows.');
+          }
+          const headers = (rawRows[0] || []).map(String);
+          const rows = rawRows.slice(1);
+          const records = parseRowsToRecords(headers, rows);
+          setEmployeeData(records);
+          setIsFileUploaded(true);
+          setIsOrgChartTested(false);
+          setIsOrgChartAccepted(false);
+          setOrgChartTree(null);
+        } catch (err: any) {
+          setUploadError(err.message || 'Failed to parse Excel file.');
+          setIsFileUploaded(false);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      reader.onload = (e) => {
+        try {
+          const text = e.target?.result as string;
+          const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+          if (lines.length < 2) {
+            throw new Error('File must contain a header row and data rows.');
+          }
+          const parseLine = (line: string): string[] => {
+            const result: string[] = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+              const char = line[i];
+              if (char === '"') {
+                inQuotes = !inQuotes;
+              } else if (char === ',' && !inQuotes) {
+                result.push(current.trim());
+                current = '';
+              } else {
+                current += char;
+              }
+            }
+            result.push(current.trim());
+            return result;
+          };
+          const headers = parseLine(lines[0]);
+          const rows = lines.slice(1).map(parseLine);
+          const records = parseRowsToRecords(headers, rows);
+          setEmployeeData(records);
+          setIsFileUploaded(true);
+          setIsOrgChartTested(false);
+          setIsOrgChartAccepted(false);
+          setOrgChartTree(null);
+        } catch (err: any) {
+          setUploadError(err.message || 'Failed to parse file.');
+          setIsFileUploaded(false);
+        }
+      };
+      reader.readAsText(file);
+    }
   };
 
   // Load sample data
-  const handleLoadSampleCsv = () => {
-    setCsvError(null);
-    setCsvFileName('sample_company_hierarchy.csv');
-    const records = parseCsvText(SAMPLE_CSV_CONTENT);
-    setCsvData(records);
-    setIsCsvUploaded(true);
+  const handleLoadSampleData = () => {
+    setUploadError(null);
+    setUploadedFileName('sample_company_hierarchy.xlsx');
+    const records = parseRowsToRecords(TEMPLATE_HEADERS, SAMPLE_EMPLOYEES_DATA);
+    setEmployeeData(records);
+    setIsFileUploaded(true);
     setIsOrgChartTested(false);
     setIsOrgChartAccepted(false);
     setOrgChartTree(null);
   };
 
-  // Trigger download of standard CSV template
-  const handleDownloadTemplate = () => {
-    const blob = new Blob([SAMPLE_CSV_CONTENT], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'company_hierarchy_template.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  // Download genuine Excel Template (.xlsx)
+  const handleDownloadExcelTemplate = () => {
+    const wsData = [TEMPLATE_HEADERS, ...SAMPLE_EMPLOYEES_DATA];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Set explicit column widths for readability
+    ws['!cols'] = [
+      { wch: 14 }, // employee_id
+      { wch: 14 }, // first_name
+      { wch: 14 }, // last_name
+      { wch: 26 }, // work_email
+      { wch: 22 }, // manager_employee_id
+      { wch: 24 }, // manager_email
+      { wch: 26 }, // job_title
+      { wch: 18 }, // department
+      { wch: 16 }, // preferred_name
+      { wch: 18 }, // location
+      { wch: 18 }, // employment_status
+      { wch: 14 }, // hire_date
+      { wch: 16 }, // employee_type
+      { wch: 14 }  // cost_center
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Employee Directory');
+    XLSX.writeFile(wb, 'company_hierarchy_template.xlsx');
   };
 
   // "Test upload" handler: builds and reveals org chart in box
   const handleTestUpload = () => {
-    setCsvError(null);
+    setUploadError(null);
     try {
-      const recordsToUse = csvData.length > 0 ? csvData : parseCsvText(SAMPLE_CSV_CONTENT);
-      if (csvData.length === 0) {
-        setCsvData(recordsToUse);
+      const recordsToUse = employeeData.length > 0 
+        ? employeeData 
+        : parseRowsToRecords(TEMPLATE_HEADERS, SAMPLE_EMPLOYEES_DATA);
+      if (employeeData.length === 0) {
+        setEmployeeData(recordsToUse);
       }
       const tree = buildTree(recordsToUse);
       setOrgChartTree(tree);
       setIsOrgChartTested(true);
       setIsOrgChartAccepted(false);
     } catch (err: any) {
-      setCsvError(`Failed to generate org chart: ${err.message}`);
+      setUploadError(`Failed to generate org chart: ${err.message}`);
     }
   };
 
@@ -421,10 +504,8 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
         {/* Tree Branch Connectors */}
         {hasChildren && !isCollapsed && (
           <div className="flex flex-col items-center w-full">
-            {/* Vertical stem from parent */}
             <div className="w-0.5 h-6 bg-neutral-400"></div>
 
-            {/* Horizontal distribution bar if multiple children */}
             {node.children.length > 1 && (
               <div 
                 className="h-0.5 bg-neutral-400"
@@ -434,11 +515,9 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
               ></div>
             )}
 
-            {/* Child nodes array */}
             <div className="flex items-start justify-center gap-6 pt-2">
               {node.children.map((child) => (
                 <div key={child.employee_id} className="flex flex-col items-center">
-                  {/* Vertical connector to child */}
                   <div className="w-0.5 h-4 bg-neutral-400 -mt-2 mb-2"></div>
                   {renderOrgNode(child)}
                 </div>
@@ -485,7 +564,7 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=60&h=60&fit=crop',
     };
 
-    const count = csvData.length > 0 ? csvData.length : 8;
+    const count = employeeData.length > 0 ? employeeData.length : 8;
 
     setTimeout(() => {
       setIsSubmitting(false);
@@ -696,24 +775,26 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
           </div>
 
           {/* Pulldown menu for Onboarding Options */}
-          <div className="sm:w-72">
+          <div className="sm:w-80">
             <select
               value={onboardingOption}
               onChange={(e) => setOnboardingOption(e.target.value as any)}
               className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-medium focus:outline-none focus:border-emerald-500 cursor-pointer shadow-inner"
             >
-              <option value="csv">Option 1: CSV Template Download & Upload</option>
-              <option value="hris_manual">Option 2: HRIS Manual Upload (ADP active)</option>
-              <option value="hris_integration" disabled>Option 3: HRIS Integration (Disabled / Not Ready)</option>
+              <option value="excel">Option 1: Excel Template Download & Upload (.xlsx)</option>
+              <option value="hris_manual">Option 2: HRIS Manual Upload (ADP Workforce Now)</option>
+              <option value="hris_integration" disabled className="text-neutral-500">
+                Option 3: HRIS Integration (Disabled / Not Ready)
+              </option>
             </select>
           </div>
         </div>
 
-        {/* ================= OPTION 1: CSV TEMPLATE DOWNLOAD & UPLOAD ================= */}
-        {onboardingOption === 'csv' && (
-          <div className="space-y-6 animate-in fade-in duration-150" id="option_csv_zone">
+        {/* ================= OPTION 1: EXCEL TEMPLATE DOWNLOAD & UPLOAD (.xlsx) ================= */}
+        {onboardingOption === 'excel' && (
+          <div className="space-y-6 animate-in fade-in duration-150" id="option_excel_zone">
             
-            {/* 1. Customer Admin Creation Fields (Directly ABOVE CSV Upload Zone) */}
+            {/* 1. Customer Admin Creation Fields (Directly ABOVE File Upload Zone) */}
             <div className="bg-neutral-900/60 border border-emerald-500/40 rounded-xl p-5 shadow-sm space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-neutral-800">
                 <div className="flex items-center gap-2">
@@ -766,26 +847,26 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
                     required
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
-                    placeholder="e.g. admin@nexushorizons.com"
+                    placeholder="e.g. admin@company.com"
                     className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-emerald-500"
                   />
                 </div>
               </div>
             </div>
 
-            {/* 2. CSV Specification & Download Template Strip */}
+            {/* 2. Excel Specification & Download Template Strip */}
             <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-5 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
                   <h3 className="text-xs font-bold text-white uppercase font-mono tracking-wider">
-                    CSV Hierarchy Template & Specification
+                    Excel Hierarchy Template & Specification
                   </h3>
                   <button
                     type="button"
                     onClick={() => setIsInfoModalOpen(true)}
                     className="p-1 rounded-full bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white transition-colors cursor-pointer border border-neutral-700"
-                    title="Information about CSV download/upload requirements"
+                    title="Information about Excel template requirements and colored tiers"
                   >
                     <Info className="w-3.5 h-3.5 text-blue-400" />
                   </button>
@@ -794,15 +875,15 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={handleDownloadTemplate}
-                    className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold rounded-lg border border-neutral-700 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+                    onClick={handleDownloadExcelTemplate}
+                    className="px-3.5 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold rounded-lg border border-neutral-700 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
                   >
                     <Download className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Download CSV Template (.csv)</span>
+                    <span>Download Excel Template (.xlsx)</span>
                   </button>
                   <button
                     type="button"
-                    onClick={handleLoadSampleCsv}
+                    onClick={handleLoadSampleData}
                     className="px-3 py-1.5 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 text-xs font-semibold rounded-lg border border-emerald-800 transition-colors cursor-pointer flex items-center gap-1.5"
                   >
                     <RefreshCw className="w-3 h-3" />
@@ -831,7 +912,7 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
                   </div>
                 </div>
 
-                {/* The 14 Colored CSV Columns */}
+                {/* The 14 Colored Columns */}
                 <div className="flex flex-wrap gap-1.5 font-mono text-[10px]">
                   {/* Required (Red) */}
                   {['employee_id', 'first_name', 'last_name', 'work_email', 'manager_employee_id'].map(col => (
@@ -858,30 +939,30 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
                 </div>
               </div>
 
-              {/* 3. CSV File Upload Dropzone */}
+              {/* 3. Excel File Upload Dropzone */}
               <div
-                onClick={() => csvFileInputRef.current?.click()}
+                onClick={() => fileInputRef.current?.click()}
                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 onDrop={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                    handleCsvFile(e.dataTransfer.files[0]);
+                    handleSpreadsheetFile(e.dataTransfer.files[0]);
                   }
                 }}
                 className={`p-6 rounded-xl border-2 border-dashed transition-all cursor-pointer text-center ${
-                  isCsvUploaded 
+                  isFileUploaded 
                     ? 'border-emerald-500/70 bg-emerald-950/20' 
                     : 'border-neutral-700 hover:border-emerald-500/50 bg-neutral-950'
                 }`}
               >
                 <input
-                  ref={csvFileInputRef}
+                  ref={fileInputRef}
                   type="file"
-                  accept=".csv,text/csv"
+                  accept=".xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, .xls, .csv, text/csv"
                   onChange={(e) => {
                     if (e.target.files && e.target.files[0]) {
-                      handleCsvFile(e.target.files[0]);
+                      handleSpreadsheetFile(e.target.files[0]);
                     }
                   }}
                   className="hidden"
@@ -889,28 +970,28 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
 
                 <div className="flex flex-col items-center justify-center space-y-2">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    isCsvUploaded ? 'bg-emerald-500/20 text-emerald-400' : 'bg-neutral-800 text-neutral-400'
+                    isFileUploaded ? 'bg-emerald-500/20 text-emerald-400' : 'bg-neutral-800 text-neutral-400'
                   }`}>
-                    {isCsvUploaded ? <Check className="w-5 h-5" /> : <Upload className="w-5 h-5" />}
+                    {isFileUploaded ? <Check className="w-5 h-5" /> : <Upload className="w-5 h-5" />}
                   </div>
 
                   <div>
-                    {isCsvUploaded ? (
+                    {isFileUploaded ? (
                       <div className="space-y-0.5">
                         <span className="text-xs font-bold text-white block">
-                          File Loaded: {csvFileName}
+                          File Loaded: {uploadedFileName}
                         </span>
                         <span className="text-[11px] text-emerald-400 font-mono">
-                          {csvData.length > 0 ? `${csvData.length} Employee Records Verified` : 'Sample Employee Data Ready'}
+                          {employeeData.length > 0 ? `${employeeData.length} Employee Records Verified` : 'Sample Employee Data Ready'}
                         </span>
                       </div>
                     ) : (
                       <div>
                         <span className="text-xs font-bold text-white block">
-                          Drag & drop employee CSV here, or click to browse
+                          Drag & drop employee Excel (.xlsx) file here, or click to browse
                         </span>
                         <span className="text-[11px] text-neutral-500 font-mono">
-                          Supports RFC-compliant CSV files with colored header structure
+                          Supports Microsoft Excel (.xlsx) templates with colored header structure
                         </span>
                       </div>
                     )}
@@ -918,10 +999,10 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
                 </div>
               </div>
 
-              {csvError && (
+              {uploadError && (
                 <div className="p-3 bg-red-950/50 border border-red-800 text-red-300 rounded-lg text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
-                  <span>{csvError}</span>
+                  <span>{uploadError}</span>
                 </div>
               )}
 
@@ -984,7 +1065,7 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
                   </div>
                 </div>
 
-                {/* THE ORG CHART BOX: Light Grey Background (#f3f4f6 / bg-neutral-100), Black Text, Clean and Simple */}
+                {/* THE ORG CHART BOX: Light Grey Background (#f3f4f6), Black Text, Clean and Simple */}
                 <div className="bg-[#f4f5f7] border-2 border-neutral-300 rounded-2xl p-6 sm:p-8 shadow-inner overflow-x-auto min-h-[380px] flex justify-center items-start text-neutral-900">
                   <div className="min-w-fit flex flex-col items-center">
                     {renderOrgNode(orgChartTree)}
@@ -995,7 +1076,7 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
           </div>
         )}
 
-        {/* ================= OPTION 2: HRIS MANUAL UPLOAD (ADP only) ================= */}
+        {/* ================= OPTION 2: HRIS MANUAL UPLOAD (Certified Vendors with only ADP selectable) ================= */}
         {onboardingOption === 'hris_manual' && (
           <div className="space-y-6 animate-in fade-in duration-150 p-6 bg-neutral-900/50 rounded-xl border border-neutral-800" id="option_hris_zone">
             <div>
@@ -1014,26 +1095,31 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
               <select
                 value={selectedHris}
                 onChange={(e) => setSelectedHris(e.target.value)}
-                className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
               >
-                {HR_SYSTEMS_LIST.map((hris) => {
+                {CERTIFIED_HRIS_VENDORS.map((hris) => {
                   const isAdp = hris.startsWith('ADP');
                   return (
-                    <option key={hris} value={hris} disabled={!isAdp}>
+                    <option 
+                      key={hris} 
+                      value={hris} 
+                      disabled={!isAdp}
+                      className={!isAdp ? 'text-neutral-500 bg-neutral-900' : 'text-white bg-neutral-950 font-semibold'}
+                    >
                       {hris} {isAdp ? '— Supported & Selectable' : '(Coming Soon)'}
                     </option>
                   );
                 })}
               </select>
               <p className="text-[10px] text-emerald-400 font-mono">
-                Currently, <strong>ADP</strong> is active. Other HRIS export parsers will be enabled in the upcoming release.
+                Currently, <strong>ADP Workforce Now</strong> is active and supported. Other HRIS export parsers are greyed out for the upcoming release.
               </p>
             </div>
 
             <div className="p-8 border-2 border-dashed border-neutral-700 rounded-xl bg-neutral-950 text-center space-y-2">
               <Upload className="w-8 h-8 text-neutral-500 mx-auto" />
               <p className="text-xs font-semibold text-white">Upload ADP Standard Employee Export</p>
-              <p className="text-[11px] text-neutral-500 font-mono">Supports standard ADP Workforce Now / Vantage .csv & .xlsx files</p>
+              <p className="text-[11px] text-neutral-500 font-mono">Supports standard ADP Workforce Now / Vantage .xlsx & .csv files</p>
               <button
                 type="button"
                 className="mt-2 px-4 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg text-xs font-semibold cursor-pointer border border-neutral-700"
@@ -1085,7 +1171,7 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
         </div>
       </div>
 
-      {/* ================= CENTERED INFO MODAL: CSV Column Specification ================= */}
+      {/* ================= CENTERED INFO MODAL: Excel Column Specification ================= */}
       {isInfoModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-[#0f1015] border border-neutral-800 rounded-2xl max-w-2xl w-full p-6 sm:p-7 shadow-2xl relative text-left max-h-[90vh] overflow-y-auto">
@@ -1095,7 +1181,7 @@ export const CustomerOnboardingFlow: React.FC<CustomerOnboardingFlowProps> = ({
                   <Info className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">CSV Specification & Requirements</h3>
+                  <h3 className="text-sm font-bold text-white">Excel Template Specification & Requirements</h3>
                   <p className="text-[11px] text-neutral-400">Column rules and hierarchy generation logic</p>
                 </div>
               </div>
